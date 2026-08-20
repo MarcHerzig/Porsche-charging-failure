@@ -235,7 +235,11 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
 /* ---------- Requests table ---------- */
 .req-status-ok { color: var(--ok); }
 .req-status-fail { color: var(--error); font-weight: 600; }
-.req-url { font-family: monospace; font-size: 0.78rem; color: var(--muted); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.req-url { font-family: monospace; font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+
+.stack { display: flex; flex-direction: column; gap: 1.25rem; }
+.table-scroll { overflow-x: auto; }
+.table-scroll table { min-width: max-content; }
 
 /* ---------- Forecast strip ---------- */
 .card-forecast { grid-column: 1 / -1; }

@@ -143,17 +143,17 @@
           <span id="settings-saved" class="saved-hint"></span>
         </div>
 
+        <div class="card card-forecast">
+          <h2>PV-Forecast <small id="forecast-location"></small></h2>
+          <div id="forecast-strip" class="forecast-strip"></div>
+          <p id="forecast-error" class="errors"></p>
+        </div>
+
         <div class="card">
           <h2>Wallbox</h2>
           <p class="hint">Erzwungener Neustart der Easee-Wallbox, unabhaengig vom Lademodus.</p>
           <button class="btn-outline" id="reboot-btn">Ladestation jetzt neu booten</button>
           <span id="reboot-hint" class="saved-hint"></span>
-        </div>
-
-        <div class="card card-forecast">
-          <h2>PV-Forecast <small id="forecast-location"></small></h2>
-          <div id="forecast-strip" class="forecast-strip"></div>
-          <p id="forecast-error" class="errors"></p>
         </div>
 
         <div class="card card-forecast card-error-panel" id="error-panel" style="display:none">
@@ -224,21 +224,25 @@ porschecli -e DEINE@EMAIL -s porsche.session list</pre>
     </section>
 
     <section id="tab-log" class="tab">
-      <div class="grid">
+      <div class="stack">
         <div class="card">
           <h2>Letzte Aktionen</h2>
-          <table id="log-table">
-            <thead><tr><th>Zeit</th><th>Typ</th><th>Nachricht</th></tr></thead>
-            <tbody></tbody>
-          </table>
+          <div class="table-scroll">
+            <table id="log-table">
+              <thead><tr><th>Zeit</th><th>Typ</th><th>Nachricht</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="card">
-          <h2>API-Aufrufe <small>an Easee/Porsche/Solar Manager/Open-Meteo</small></h2>
-          <table id="requests-table">
-            <thead><tr><th>Zeit</th><th>Quelle</th><th>Methode</th><th>Status</th><th>URL</th></tr></thead>
-            <tbody></tbody>
-          </table>
+          <h2>API-Befehle <small>ausgehende Aktionen (kein Status-Polling)</small></h2>
+          <div class="table-scroll">
+            <table id="requests-table">
+              <thead><tr><th>Zeit</th><th>Quelle</th><th>Methode</th><th>Status</th><th>URL</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
