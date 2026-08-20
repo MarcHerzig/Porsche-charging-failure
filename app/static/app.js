@@ -23,7 +23,7 @@ async function refreshLive() {
   $("pv-watts").textContent = data.pv_watts != null ? Math.round(data.pv_watts) : "–";
   $("consumption-watts").textContent = data.consumption_w != null ? Math.round(data.consumption_w) : "–";
   $("charging-state").textContent =
-    data.charging_active === true ? "laedt (Ziel)" : data.charging_active === false ? "pausiert (Ziel)" : "–";
+    data.charging_active === true ? "⚡ laedt (Ziel)" : data.charging_active === false ? "⏸ pausiert (Ziel)" : "–";
   $("easee-state").textContent = data.easee_op_mode
     ? `${data.easee_op_mode}${data.easee_reason ? " / " + data.easee_reason : ""}`
     : "–";
@@ -33,6 +33,8 @@ async function refreshLive() {
 
   const errors = [data.solar_error, data.easee_error, data.porsche_error].filter(Boolean);
   $("live-errors").textContent = errors.join(" | ");
+  $("status-dot").style.background = errors.length ? "var(--error)" : "var(--ok)";
+  $("status-dot").style.boxShadow = errors.length ? "0 0 8px var(--error)" : "0 0 8px var(--ok)";
 
   const tbody = document.querySelector("#forecast-table tbody");
   tbody.innerHTML = "";
@@ -75,6 +77,11 @@ async function loadSettings() {
   $("reboot-cooldown").value = s.reboot_cooldown_min;
   if (s.lat != null) $("lat").value = s.lat;
   if (s.lon != null) $("lon").value = s.lon;
+  $("forecast-location").textContent = s.location_name ? `— ${s.location_name}` : "";
+  if (s.location_name) {
+    $("location-query").value = s.location_name;
+    $("location-resolved").textContent = `Aktuell: ${s.location_name} (${s.lat}, ${s.lon})`;
+  }
   updateSmartVisibility();
 }
 
@@ -106,11 +113,6 @@ async function loadCredentials() {
   $("easee-email").value = c.easee_email || "";
   $("easee-charger-id").value = c.easee_charger_id || "";
   $("solar-base-url").value = c.solar_base_url || "";
-
-  const settingsRes = await fetch("/api/settings");
-  const s = await settingsRes.json();
-  if (s.lat != null) $("lat").value = s.lat;
-  if (s.lon != null) $("lon").value = s.lon;
 }
 
 async function saveCredentials() {
@@ -130,21 +132,32 @@ async function saveCredentials() {
     body: JSON.stringify(payload),
   });
 
-  const lat = $("lat").value;
-  const lon = $("lon").value;
-  if (lat && lon) {
-    await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lat: Number(lat), lon: Number(lon) }),
-    });
-  }
-
   $("porsche-password").value = "";
   $("easee-password").value = "";
   $("solar-api-key").value = "";
   $("credentials-saved").textContent = "Gespeichert ✓";
   setTimeout(() => ($("credentials-saved").textContent = ""), 2000);
+}
+
+async function doGeocode() {
+  const query = $("location-query").value.trim();
+  if (!query) return;
+  $("location-resolved").textContent = "Suche...";
+  try {
+    const res = await fetch("/api/geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || `HTTP ${res.status}`);
+    $("lat").value = body.lat;
+    $("lon").value = body.lon;
+    $("location-resolved").textContent = `Gefunden: ${body.display_name} (${body.lat}, ${body.lon})`;
+    $("forecast-location").textContent = `— ${body.display_name}`;
+  } catch (err) {
+    $("location-resolved").textContent = "Fehler: " + err.message;
+  }
 }
 
 async function doReboot() {
@@ -176,6 +189,7 @@ function init() {
   $("save-settings").addEventListener("click", saveSettings);
   $("save-credentials").addEventListener("click", saveCredentials);
   $("reboot-btn").addEventListener("click", doReboot);
+  $("geocode-btn").addEventListener("click", doGeocode);
 
   setInterval(refreshLive, 10000);
   setInterval(refreshLog, 15000);

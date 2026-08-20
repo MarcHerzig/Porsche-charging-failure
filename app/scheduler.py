@@ -197,6 +197,10 @@ async def _tick_forecast() -> None:
         LIVE["forecast_error"] = str(exc)
 
 
+async def refresh_forecast() -> None:
+    await _tick_forecast()
+
+
 async def manual_reboot() -> None:
     creds = db.get_credentials(decrypted=True)
     await easee_client.reboot(creds["easee_email"], creds["easee_password"], creds["easee_charger_id"])

@@ -4,11 +4,18 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Porsche Solar Charge Guard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <header>
-    <h1>🔌 Porsche Solar Charge Guard</h1>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="wordmark">PORSCHE</div>
+      <div class="tagline">SOLAR CHARGE GUARD</div>
+      <div class="stripe"></div>
+    </div>
     <nav>
       <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
       <button class="tab-btn" data-tab="credentials">Zugangsdaten</button>
@@ -19,36 +26,56 @@
   <main>
     <section id="tab-dashboard" class="tab active">
       <div class="grid">
-        <div class="card">
-          <h2>Live</h2>
-          <div class="stat"><span id="pv-watts">–</span><small>PV-Produktion (W)</small></div>
-          <div class="stat"><span id="consumption-watts">–</span><small>Verbrauch (W)</small></div>
-          <div class="stat"><span id="charging-state">–</span><small>Lade-Status (App)</small></div>
-          <div class="stat"><span id="easee-state">–</span><small>Easee-Wallbox</small></div>
-          <div class="stat"><span id="porsche-state">–</span><small>Porsche</small></div>
+        <div class="card card-live">
+          <h2><span class="dot" id="status-dot"></span>Live</h2>
+          <div class="stat-row">
+            <div class="stat">
+              <span class="stat-icon">☀️</span>
+              <div>
+                <span id="pv-watts">–</span>
+                <small>PV-Produktion (W)</small>
+              </div>
+            </div>
+            <div class="stat">
+              <span class="stat-icon">🏠</span>
+              <div>
+                <span id="consumption-watts">–</span>
+                <small>Verbrauch (W)</small>
+              </div>
+            </div>
+          </div>
+          <div class="pill-row">
+            <span class="pill" id="charging-state">–</span>
+            <span class="pill" id="easee-state">–</span>
+            <span class="pill" id="porsche-state">–</span>
+          </div>
           <p id="live-errors" class="errors"></p>
         </div>
 
         <div class="card">
-          <h2>Modus</h2>
-          <label class="radio">
-            <input type="radio" name="mode" value="smart" /> Smart laden (nur wenn genug Sonne)
-          </label>
-          <label class="radio">
-            <input type="radio" name="mode" value="always" /> Immer laden
-          </label>
+          <h2>Lademodus</h2>
+          <div class="segmented">
+            <label class="segment">
+              <input type="radio" name="mode" value="smart" />
+              <span>Smart laden</span>
+            </label>
+            <label class="segment">
+              <input type="radio" name="mode" value="always" />
+              <span>Immer laden</span>
+            </label>
+          </div>
 
           <div id="smart-settings">
-            <label>
-              Schwellwert (Watt): <span id="threshold-value">–</span>
+            <label class="field">
+              <span class="field-label">Schwellwert <strong id="threshold-value">–</strong></span>
               <input type="range" id="threshold" min="0" max="11000" step="100" />
             </label>
 
             <div class="row">
-              <label>Start-Verzoegerung (Min)
+              <label class="field">Start-Verzoegerung (Min)
                 <input type="number" id="start-debounce" min="0" max="60" />
               </label>
-              <label>Stopp-Verzoegerung (Min)
+              <label class="field">Stopp-Verzoegerung (Min)
                 <input type="number" id="stop-debounce" min="0" max="60" />
               </label>
             </div>
@@ -57,12 +84,12 @@
               <input type="checkbox" id="curfew-enabled" /> Sperrzone aktiv
             </label>
             <div class="row">
-              <label>Von <input type="time" id="curfew-start" /></label>
-              <label>Bis <input type="time" id="curfew-end" /></label>
+              <label class="field">Von <input type="time" id="curfew-start" /></label>
+              <label class="field">Bis <input type="time" id="curfew-end" /></label>
             </div>
           </div>
 
-          <label>Reboot-Cooldown (Min)
+          <label class="field">Reboot-Cooldown (Min)
             <input type="number" id="reboot-cooldown" min="1" max="240" />
           </label>
 
@@ -72,12 +99,13 @@
 
         <div class="card">
           <h2>Wallbox</h2>
-          <button id="reboot-btn">Ladestation jetzt neu booten</button>
+          <p class="hint">Erzwungener Neustart der Easee-Wallbox, unabhaengig vom Lademodus.</p>
+          <button class="btn-outline" id="reboot-btn">Ladestation jetzt neu booten</button>
           <span id="reboot-hint" class="saved-hint"></span>
         </div>
 
         <div class="card">
-          <h2>PV-Forecast</h2>
+          <h2>PV-Forecast <small id="forecast-location"></small></h2>
           <table id="forecast-table">
             <thead><tr><th>Tag</th><th>Strahlung (kWh/m²)</th><th>Sonnenstunden</th></tr></thead>
             <tbody></tbody>
@@ -90,29 +118,32 @@
     <section id="tab-credentials" class="tab">
       <div class="grid">
         <div class="card">
-          <h2>Porsche Connect</h2>
-          <label>Email <input type="text" id="porsche-email" autocomplete="off" /></label>
-          <label>Passwort <input type="password" id="porsche-password" autocomplete="new-password" /></label>
-          <label>VIN (optional, leer = erstes Fahrzeug) <input type="text" id="porsche-vin" /></label>
+          <h2>🚗 Porsche Connect</h2>
+          <label class="field">Email <input type="text" id="porsche-email" autocomplete="off" /></label>
+          <label class="field">Passwort <input type="password" id="porsche-password" autocomplete="new-password" /></label>
+          <label class="field">VIN (optional, leer = erstes Fahrzeug) <input type="text" id="porsche-vin" /></label>
         </div>
 
         <div class="card">
-          <h2>Easee Wallbox</h2>
-          <label>Email <input type="text" id="easee-email" autocomplete="off" /></label>
-          <label>Passwort <input type="password" id="easee-password" autocomplete="new-password" /></label>
-          <label>Charger-ID <input type="text" id="easee-charger-id" /></label>
+          <h2>🔌 Easee Wallbox</h2>
+          <label class="field">Email <input type="text" id="easee-email" autocomplete="off" /></label>
+          <label class="field">Passwort <input type="password" id="easee-password" autocomplete="new-password" /></label>
+          <label class="field">Charger-ID <input type="text" id="easee-charger-id" /></label>
         </div>
 
         <div class="card">
-          <h2>Solar Manager</h2>
-          <label>Base-URL (lokal, z.B. https://192.168.0.50) <input type="text" id="solar-base-url" /></label>
-          <label>API-Key <input type="password" id="solar-api-key" autocomplete="new-password" /></label>
+          <h2>☀️ Solar Manager</h2>
+          <label class="field">Base-URL (lokal, z.B. https://192.168.0.50) <input type="text" id="solar-base-url" /></label>
+          <label class="field">API-Key <input type="password" id="solar-api-key" autocomplete="new-password" /></label>
         </div>
 
         <div class="card">
-          <h2>Standort (fuer PV-Forecast)</h2>
-          <label>Breitengrad <input type="number" step="0.0001" id="lat" /></label>
-          <label>Laengengrad <input type="number" step="0.0001" id="lon" /></label>
+          <h2>📍 Standort (fuer PV-Forecast)</h2>
+          <label class="field">Ort <input type="text" id="location-query" placeholder="z.B. Zuerich, Schweiz" /></label>
+          <button class="btn-outline" id="geocode-btn" type="button">Ort suchen</button>
+          <p id="location-resolved" class="hint"></p>
+          <input type="hidden" id="lat" />
+          <input type="hidden" id="lon" />
         </div>
       </div>
       <button id="save-credentials">Speichern</button>
@@ -129,6 +160,10 @@
       </div>
     </section>
   </main>
+
+  <footer>
+    <span>Porsche Solar Charge Guard — solargesteuertes Laden mit automatischer Fehlerbehebung</span>
+  </footer>
 
   <script src="/static/app.js"></script>
 </body>

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from . import db, scheduler
 from .integrations.easee_client import EaseeError
+from .integrations.geocode_client import GeocodeError, search as geocode_search
 
 BASE_DIR = Path(__file__).parent
 
@@ -54,6 +55,7 @@ class SettingsUpdate(BaseModel):
     reboot_cooldown_min: int | None = None
     lat: float | None = None
     lon: float | None = None
+    location_name: str | None = None
 
 
 @app.post("/api/settings")
@@ -87,6 +89,21 @@ async def update_credentials(payload: CredentialsUpdate):
     db.update_credentials(fields)
     db.add_event("credentials_updated", "Zugangsdaten aktualisiert")
     return db.get_credentials(decrypted=False)
+
+
+class GeocodeQuery(BaseModel):
+    query: str
+
+
+@app.post("/api/geocode")
+async def geocode(payload: GeocodeQuery):
+    try:
+        result = await geocode_search(payload.query)
+    except GeocodeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    db.update_settings({"lat": result.lat, "lon": result.lon, "location_name": result.display_name})
+    await scheduler.refresh_forecast()
+    return {"display_name": result.display_name, "lat": result.lat, "lon": result.lon}
 
 
 @app.get("/api/log")

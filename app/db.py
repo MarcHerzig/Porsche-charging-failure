@@ -37,7 +37,8 @@ def _init_schema() -> None:
                 curfew_end TEXT NOT NULL DEFAULT '07:00',
                 reboot_cooldown_min INTEGER NOT NULL DEFAULT 30,
                 lat REAL,
-                lon REAL
+                lon REAL,
+                location_name TEXT
             );
 
             CREATE TABLE IF NOT EXISTS credentials (
@@ -77,6 +78,12 @@ def _init_schema() -> None:
         _conn.execute("INSERT OR IGNORE INTO credentials (id) VALUES (1)")
         _conn.execute("INSERT OR IGNORE INTO runtime_state (id) VALUES (1)")
 
+    # Leichte Migration fuer bereits bestehende DBs (vor Einfuehrung von location_name).
+    existing_cols = {row[1] for row in _conn.execute("PRAGMA table_info(settings)")}
+    if "location_name" not in existing_cols:
+        with _conn:
+            _conn.execute("ALTER TABLE settings ADD COLUMN location_name TEXT")
+
 
 _init_schema()
 
@@ -114,6 +121,7 @@ def update_settings(fields: dict[str, Any]) -> None:
         "reboot_cooldown_min",
         "lat",
         "lon",
+        "location_name",
     }
     fields = {k: v for k, v in fields.items() if k in allowed}
     if not fields:
