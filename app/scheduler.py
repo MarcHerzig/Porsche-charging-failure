@@ -30,10 +30,26 @@ LIVE: dict = {
     "porsche_battery": None,
     "porsche_error": None,
     "porsche_updated_at": None,
+    "porsche_connected": None,
+    "porsche_distance_km": None,
+    "porsche_is_home": None,
     "forecast": [],
     "forecast_error": None,
     "charging_active": None,
 }
+
+
+HOME_RADIUS_KM = 0.3
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    from math import asin, cos, radians, sin, sqrt
+
+    r = 6371.0
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    return 2 * r * asin(sqrt(a))
 
 
 def _parse_ts(value: str | None) -> datetime | None:
@@ -137,16 +153,27 @@ async def _tick_porsche() -> None:
         )
     except porsche_client.PorscheError as exc:
         LIVE["porsche_error"] = str(exc)
+        LIVE["porsche_connected"] = False
         db.add_event("porsche_error", f"Porsche-Connect-Fehler: {exc}")
         db.update_runtime_state({"last_checked_at": now.isoformat()})
         return
 
     db.update_credentials({"porsche_session": status.session_json})
+
+    distance_km = None
+    is_home = None
+    if status.lat is not None and status.lon is not None and settings["lat"] is not None and settings["lon"] is not None:
+        distance_km = round(_haversine_km(status.lat, status.lon, settings["lat"], settings["lon"]), 2)
+        is_home = distance_km <= HOME_RADIUS_KM
+
     LIVE.update(
         porsche_status=status.status,
         porsche_battery=status.battery_percent,
         porsche_error=None,
+        porsche_connected=True,
         porsche_updated_at=now.isoformat(),
+        porsche_distance_km=distance_km,
+        porsche_is_home=is_home,
     )
     db.update_runtime_state(
         {"last_porsche_status": status.status, "last_checked_at": now.isoformat()}

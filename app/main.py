@@ -34,6 +34,8 @@ async def _startup() -> None:
 @app.on_event("shutdown")
 async def _shutdown() -> None:
     scheduler.stop()
+    await easee_client.close()
+    await porsche_client.close()
 
 
 @app.get("/", response_class=HTMLResponse)

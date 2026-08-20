@@ -62,8 +62,33 @@ async function refreshLive() {
     ? `${data.easee_op_mode}${data.easee_reason ? " / " + data.easee_reason : ""}`
     : "–";
   $("porsche-state").textContent = data.porsche_status
-    ? `${porscheIcon(data.porsche_status, !!data.porsche_error)} ${data.porsche_status}${data.porsche_battery != null ? " (" + data.porsche_battery + "%)" : ""}`
+    ? `${porscheIcon(data.porsche_status, !!data.porsche_error)} ${data.porsche_status}`
     : `${porscheIcon(null, !!data.porsche_error)} –`;
+
+  $("porsche-battery-stat").textContent = data.porsche_battery != null ? `${Math.round(data.porsche_battery)}%` : "–";
+
+  const led = $("porsche-led");
+  if (data.porsche_connected === true) {
+    led.className = "led ok";
+    led.title = "Porsche Connect verbunden";
+  } else if (data.porsche_connected === false) {
+    led.className = "led fail";
+    led.title = data.porsche_error || "Verbindung fehlgeschlagen";
+  } else {
+    led.className = "led";
+    led.title = "Noch keine Daten";
+  }
+
+  if (data.porsche_is_home === true) {
+    $("porsche-home-icon").textContent = "🏠";
+    $("porsche-location").textContent = "Zuhause";
+  } else if (data.porsche_is_home === false) {
+    $("porsche-home-icon").textContent = "📍";
+    $("porsche-location").textContent = `${data.porsche_distance_km} km entfernt`;
+  } else {
+    $("porsche-home-icon").textContent = "📍";
+    $("porsche-location").textContent = "Unbekannt";
+  }
 
   const errors = [data.solar_error, data.easee_error, data.porsche_error].filter(Boolean);
   $("live-errors").textContent = errors.join(" | ");
