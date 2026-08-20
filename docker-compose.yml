@@ -1,7 +1,7 @@
 services:
   porsche-charge-guard:
     build: .
-    # image: ghcr.io/marcherzig/porsche-charching-failure:latest
+    # image: ghcr.io/marcherzig/porsche-charging-failure:latest
     container_name: porsche-charge-guard
     restart: unless-stopped
     ports:

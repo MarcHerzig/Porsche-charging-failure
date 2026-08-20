@@ -23,8 +23,8 @@ gesteckt wird. Diese App ueberwacht Fahrzeug, Wallbox und PV-Anlage und:
 ## Start (Docker Compose)
 
 ```bash
-git clone https://github.com/MarcHerzig/Porsche-charching-failure.git
-cd Porsche-charching-failure
+git clone https://github.com/MarcHerzig/Porsche-charging-failure.git
+cd Porsche-charging-failure
 docker compose up -d --build
 ```
 
