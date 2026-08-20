@@ -60,11 +60,35 @@ async function refreshLive() {
 
   $("pv-watts").textContent = data.pv_watts != null ? Math.round(data.pv_watts) : "–";
   $("consumption-watts").textContent = data.consumption_w != null ? Math.round(data.consumption_w) : "–";
-  $("charging-state").textContent =
-    data.charging_active === true ? "⚡ laedt (Ziel)" : data.charging_active === false ? "⏸ pausiert (Ziel)" : "–";
-  $("easee-state").textContent = data.easee_op_mode
-    ? `${data.easee_op_mode}${data.easee_reason ? " / " + data.easee_reason : ""}`
-    : "–";
+
+  const chargingBadge = $("charging-badge");
+  if (data.charging_active === true) {
+    $("charging-badge-icon").textContent = "⚡";
+    $("charging-state").textContent = "Laedt";
+    chargingBadge.className = "status-badge ok";
+  } else if (data.charging_active === false) {
+    $("charging-badge-icon").textContent = "⏸";
+    $("charging-state").textContent = "Pausiert";
+    chargingBadge.className = "status-badge neutral";
+  } else {
+    $("charging-badge-icon").textContent = "❔";
+    $("charging-state").textContent = "–";
+    chargingBadge.className = "status-badge neutral";
+  }
+
+  const easeeBadge = $("easee-badge");
+  $("easee-op-mode").textContent = data.easee_op_mode || "–";
+  if (data.easee_op_mode == null) {
+    $("easee-reason-text").textContent = "";
+    easeeBadge.className = "status-badge neutral";
+  } else if (data.easee_has_current === false) {
+    $("easee-reason-text").textContent = `Kein Strom -- ${data.easee_reason || ""}`;
+    easeeBadge.className = "status-badge neutral";
+  } else {
+    $("easee-reason-text").textContent = "";
+    easeeBadge.className = "status-badge ok";
+  }
+
   $("porsche-state").textContent = data.porsche_captcha_pending
     ? "🧩 Captcha noetig -- im Zugangsdaten-Tab loesen"
     : data.porsche_status
@@ -96,10 +120,26 @@ async function refreshLive() {
     $("porsche-location").textContent = "Unbekannt";
   }
 
-  const errors = [data.solar_error, data.easee_error, data.porsche_error].filter(Boolean);
-  $("live-errors").textContent = errors.join(" | ");
-  $("status-dot").style.background = errors.length ? "var(--error)" : "var(--ok)";
-  $("status-dot").style.boxShadow = errors.length ? "0 0 8px var(--error)" : "0 0 8px var(--ok)";
+  const namedErrors = [
+    ["Solar Manager", data.solar_error],
+    ["Easee", data.easee_error],
+    ["Porsche Connect", data.porsche_error],
+  ].filter(([, msg]) => Boolean(msg));
+
+  const panel = $("error-panel");
+  const list = $("error-list");
+  if (namedErrors.length) {
+    panel.style.display = "block";
+    list.innerHTML = namedErrors
+      .map(([src, msg]) => `<div class="error-row"><strong>${src}:</strong> ${msg}</div>`)
+      .join("");
+  } else {
+    panel.style.display = "none";
+    list.innerHTML = "";
+  }
+
+  $("status-dot").style.background = namedErrors.length ? "var(--error)" : "var(--ok)";
+  $("status-dot").style.boxShadow = namedErrors.length ? "0 0 8px var(--error)" : "0 0 8px var(--ok)";
 
   renderForecast(data.forecast || []);
   $("forecast-error").textContent = data.forecast_error || "";
@@ -113,6 +153,28 @@ async function refreshLog() {
   events.forEach((e) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${fmtTime(e.ts)}</td><td>${e.type}</td><td>${e.message}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function shortUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.pathname + (u.search ? "?…" : "");
+  } catch {
+    return url;
+  }
+}
+
+async function refreshRequests() {
+  const res = await fetch("/api/requests?limit=30");
+  const requests = await res.json();
+  const tbody = document.querySelector("#requests-table tbody");
+  tbody.innerHTML = "";
+  requests.forEach((r) => {
+    const tr = document.createElement("tr");
+    const statusClass = r.status && r.status >= 400 ? "req-status-fail" : "req-status-ok";
+    tr.innerHTML = `<td>${fmtTime(r.ts)}</td><td>${r.source}</td><td>${r.method}</td><td class="${statusClass}">${r.status ?? "–"}</td><td class="req-url" title="${r.url}">${shortUrl(r.url)}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -362,6 +424,7 @@ function init() {
   loadCredentials();
   refreshLive();
   refreshLog();
+  refreshRequests();
 
   $("threshold").addEventListener("input", () => {
     $("threshold-value").textContent = `${$("threshold").value} W`;
@@ -381,6 +444,7 @@ function init() {
 
   setInterval(refreshLive, 10000);
   setInterval(refreshLog, 15000);
+  setInterval(refreshRequests, 15000);
 }
 
 document.addEventListener("DOMContentLoaded", init);

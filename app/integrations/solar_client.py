@@ -13,6 +13,8 @@ from dataclasses import dataclass
 
 import httpx
 
+from .. import request_log
+
 API_BASE = "https://cloud.solar-manager.ch"
 TIMEOUT_SECONDS = 10
 
@@ -41,6 +43,8 @@ async def get_current_point(sm_id: str, api_key: str) -> SolarPoint:
             response = await client.get(url, headers=headers)
     except httpx.HTTPError as exc:
         raise SolarManagerError(f"Verbindung zu Solar Manager fehlgeschlagen: {exc}") from exc
+
+    request_log.record(method="GET", url=url, status=response.status_code, source="solar_manager")
 
     if response.status_code != 200:
         raise SolarManagerError(

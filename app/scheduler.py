@@ -25,6 +25,7 @@ LIVE: dict = {
     "solar_updated_at": None,
     "easee_op_mode": None,
     "easee_reason": None,
+    "easee_has_current": None,
     "easee_error": None,
     "porsche_status": None,
     "porsche_battery": None,
@@ -155,6 +156,7 @@ async def _tick_solar_easee() -> None:
         )
         LIVE["easee_op_mode"] = state.op_mode
         LIVE["easee_reason"] = state.reason_for_no_current
+        LIVE["easee_has_current"] = state.has_current
     except easee_client.EaseeError as exc:
         LIVE["easee_error"] = str(exc)
 

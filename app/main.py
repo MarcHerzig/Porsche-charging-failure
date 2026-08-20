@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from . import db, scheduler
+from . import db, request_log, scheduler
 from .integrations import easee_client, porsche_client, solar_client
 from .integrations.easee_client import EaseeError
 from .integrations.geocode_client import GeocodeError, search as geocode_search
@@ -202,6 +202,11 @@ async def submit_porsche_captcha(payload: CaptchaSubmit):
 @app.get("/api/log")
 async def get_log(limit: int = 15):
     return db.get_events(limit=limit)
+
+
+@app.get("/api/requests")
+async def get_requests(limit: int = 30):
+    return request_log.get_entries(limit=limit)
 
 
 @app.post("/api/refresh")

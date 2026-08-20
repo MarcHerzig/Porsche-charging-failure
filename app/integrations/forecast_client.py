@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 import httpx
 
+from .. import request_log
+
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEOUT_SECONDS = 10
 
@@ -53,6 +55,8 @@ async def get_forecast(lat: float, lon: float, days: int = 5) -> ForecastResult:
             response = await client.get(FORECAST_URL, params=params)
     except httpx.HTTPError as exc:
         raise ForecastError(f"Open-Meteo nicht erreichbar: {exc}") from exc
+
+    request_log.record(method="GET", url=str(response.url), status=response.status_code, source="forecast")
 
     if response.status_code != 200:
         raise ForecastError(f"Open-Meteo Fehler ({response.status_code}): {response.text[:200]}")

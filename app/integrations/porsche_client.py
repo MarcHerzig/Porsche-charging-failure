@@ -43,6 +43,8 @@ from urllib.parse import urlparse
 
 import httpx
 import pyporscheconnectapi.oauth2 as _oauth2_module
+
+from .. import request_log
 from pyporscheconnectapi.account import PorscheConnectAccount
 from pyporscheconnectapi.connection import Connection
 from pyporscheconnectapi.exceptions import (
@@ -113,6 +115,12 @@ async def _log_request(request: httpx.Request) -> None:
 
 async def _log_response(response: httpx.Response) -> None:
     _LOG.info("Porsche-API-Antwort: %s fuer %s", response.status_code, response.request.url)
+    request_log.record(
+        method=response.request.method,
+        url=str(response.request.url),
+        status=response.status_code,
+        source="porsche",
+    )
     if response.status_code >= 400:
         await response.aread()
         _LOG.info("Porsche-API-Fehlerbody: %s", response.text[:1000])

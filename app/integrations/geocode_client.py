@@ -10,6 +10,8 @@ from dataclasses import dataclass
 
 import httpx
 
+from .. import request_log
+
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 TIMEOUT_SECONDS = 10
 
@@ -36,6 +38,8 @@ async def search(query: str) -> GeocodeResult:
             response = await client.get(GEOCODE_URL, params=params)
     except httpx.HTTPError as exc:
         raise GeocodeError(f"Geocoding nicht erreichbar: {exc}") from exc
+
+    request_log.record(method="GET", url=str(response.url), status=response.status_code, source="geocode")
 
     if response.status_code != 200:
         raise GeocodeError(f"Geocoding-Fehler ({response.status_code}): {response.text[:200]}")

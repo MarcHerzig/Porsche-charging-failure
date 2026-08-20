@@ -6,8 +6,8 @@
   --border: #29292e;
   --text: #f2f1ee;
   --muted: #9a9aa2;
-  --accent: #d5001c; /* Porsche-Rot */
-  --accent-dim: #8a0014;
+  --accent: #6b6b70;
+  --accent-dim: #4d4d52;
   --gold: #e8b23d;
   --ok: #3ddc84;
   --error: #ff6b6b;
@@ -44,7 +44,7 @@ header.hero {
   font-size: clamp(2.4rem, 6vw, 4rem);
   letter-spacing: 0.18em;
   color: var(--text);
-  text-shadow: 0 0 24px rgba(213, 0, 28, 0.35);
+  text-shadow: 0 0 24px rgba(107, 107, 112, 0.35);
   line-height: 1;
 }
 
@@ -183,6 +183,59 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
   font-size: 0.8rem;
   color: var(--text);
 }
+
+/* ---------- Status Badges ---------- */
+.status-badges { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.75rem; }
+
+.status-badge {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+}
+
+.status-badge.ok { border-color: var(--ok); }
+.status-badge.neutral { border-color: var(--border); }
+
+.status-badge-icon { font-size: 1.4rem; line-height: 1; }
+
+.status-badge-text { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.status-badge-text small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.status-badge-text span { font-weight: 600; font-size: 0.9rem; }
+.status-badge-sub {
+  font-weight: 400 !important;
+  font-size: 0.72rem !important;
+  color: var(--muted);
+  white-space: normal;
+}
+
+/* ---------- Error panel ---------- */
+.card-error-panel { border-color: var(--error); }
+.error-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.error-row {
+  background: var(--bg-alt);
+  border: 1px solid var(--error);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.error-row strong { color: var(--error); }
+
+/* ---------- Requests table ---------- */
+.req-status-ok { color: var(--ok); }
+.req-status-fail { color: var(--error); font-weight: 600; }
+.req-url { font-family: monospace; font-size: 0.78rem; color: var(--muted); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Forecast strip ---------- */
 .card-forecast { grid-column: 1 / -1; }
@@ -343,7 +396,7 @@ button:active { transform: scale(0.98); }
   border: 1px solid var(--accent);
   color: var(--accent);
 }
-.btn-outline:hover { background: rgba(213, 0, 28, 0.1); color: var(--text); }
+.btn-outline:hover { background: rgba(107, 107, 112, 0.15); color: var(--text); }
 
 .hint { color: var(--muted); font-size: 0.82rem; margin: 0.4rem 0 0.8rem; }
 .saved-hint { margin-left: 0.75rem; color: var(--ok); font-size: 0.85rem; }
