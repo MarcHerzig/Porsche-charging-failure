@@ -193,6 +193,16 @@ async def check_status(
     if not email or not password:
         raise PorscheError("Porsche-Zugangsdaten fehlen.")
 
+    # Solange ein Captcha fuer diese Zugangsdaten offen ist, KEINEN neuen
+    # Login-Versuch starten -- jeder erneute Versuch (Hintergrund-Poll alle
+    # 15 Min, Verbindungstest beim Oeffnen des Zugangsdaten-Tabs) wuerde
+    # sonst ein NEUES Captcha erzeugen und das alte state/image-Paar
+    # ungueltig machen, waehrend der User gerade genau dieses loest --
+    # der eingegebene Code wuerde dann immer mit BAD_REQUEST scheitern,
+    # weil er zu einem bereits ersetzten state gehoert.
+    if _pending_captcha and (_pending_captcha["email"], _pending_captcha["password"]) == (email, password):
+        raise PorscheCaptchaNeeded(_pending_captcha["image"])
+
     connection, controller = await _get_controller(email, password, session_json)
 
     try:
