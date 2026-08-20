@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -18,6 +19,11 @@ BASE_DIR = Path(__file__).parent
 app = FastAPI(title="Porsche Solar Charge Guard")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+# Cache-Busting: haengt an /static-URLs eine pro Prozess-Start feste Version
+# an, damit ein Deploy nicht hinter einem CDN/Browser-Cache (z.B. Cloudflare)
+# haengen bleibt, ohne dass jemand manuell einen Cache-Purge ausloesen muss.
+templates.env.globals["asset_version"] = str(int(time.time()))
 
 
 @app.on_event("startup")
