@@ -1,0 +1,217 @@
+"""Hintergrund-Loops: PV/Easee-Regelschleife (schnell), Porsche-Fehler-Check
+(langsam, 15 Min) und PV-Forecast (alle paar Stunden).
+
+Live-Werte werden im Prozessspeicher gehalten (kein Verlauf/Chart gefordert);
+persistiert wird nur, was einen Container-Neustart ueberleben muss: die
+Debounce-Timer, der zuletzt angewandte Lade-Zustand, Reboot-Zeitpunkt und
+Porsche-Fehlerbeginn.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import datetime, timezone
+
+from . import config, control, db
+from .integrations import easee_client, forecast_client, porsche_client, solar_client
+
+_LOG = logging.getLogger("scheduler")
+
+LIVE: dict = {
+    "pv_watts": None,
+    "consumption_w": None,
+    "solar_error": None,
+    "solar_updated_at": None,
+    "easee_op_mode": None,
+    "easee_reason": None,
+    "easee_error": None,
+    "porsche_status": None,
+    "porsche_battery": None,
+    "porsche_error": None,
+    "porsche_updated_at": None,
+    "forecast": [],
+    "forecast_error": None,
+    "charging_active": None,
+}
+
+
+def _parse_ts(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value)
+
+
+async def _solar_easee_loop() -> None:
+    while True:
+        try:
+            await _tick_solar_easee()
+        except Exception:  # noqa: BLE001 - Loop darf nie aussterben
+            _LOG.exception("Fehler im Solar/Easee-Loop")
+        await asyncio.sleep(config.SOLAR_EASEE_POLL_SECONDS)
+
+
+async def _tick_solar_easee() -> None:
+    creds = db.get_credentials(decrypted=True)
+    settings = db.get_settings()
+    runtime = db.get_runtime_state()
+    now = datetime.now(timezone.utc)
+
+    pv_watts = None
+    try:
+        point = await solar_client.get_current_point(creds["solar_base_url"], creds["solar_api_key"])
+        pv_watts = point.production_w
+        LIVE.update(
+            pv_watts=point.production_w,
+            consumption_w=point.consumption_w,
+            solar_error=None,
+            solar_updated_at=now.isoformat(),
+        )
+    except solar_client.SolarManagerError as exc:
+        LIVE["solar_error"] = str(exc)
+
+    decision = control.evaluate(
+        pv_watts=pv_watts,
+        now=now,
+        settings=settings,
+        prev_pending_target=bool(runtime["pending_target"]) if runtime["pending_target"] is not None else None,
+        prev_condition_since=_parse_ts(runtime["condition_since"]),
+        prev_charging_active=bool(runtime["charging_active"]),
+    )
+    LIVE["charging_active"] = decision.charging_active
+
+    db.update_runtime_state(
+        {
+            "pending_target": int(decision.raw_should_charge),
+            "condition_since": decision.condition_since.isoformat(),
+            "last_pv_watts": pv_watts,
+        }
+    )
+
+    if decision.changed:
+        try:
+            if decision.charging_active:
+                await easee_client.resume_charging(
+                    creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
+                )
+                db.add_event("charge_start", f"Laden gestartet ({decision.reason})")
+            else:
+                await easee_client.pause_charging(
+                    creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
+                )
+                db.add_event("charge_stop", f"Laden gestoppt ({decision.reason})")
+            db.update_runtime_state({"charging_active": int(decision.charging_active)})
+            LIVE["easee_error"] = None
+        except easee_client.EaseeError as exc:
+            LIVE["easee_error"] = str(exc)
+            db.add_event("easee_error", f"Easee-Befehl fehlgeschlagen: {exc}")
+
+    try:
+        state = await easee_client.get_state(
+            creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
+        )
+        LIVE["easee_op_mode"] = state.op_mode
+        LIVE["easee_reason"] = state.reason_for_no_current
+    except easee_client.EaseeError as exc:
+        LIVE["easee_error"] = str(exc)
+
+
+async def _porsche_loop() -> None:
+    while True:
+        try:
+            await _tick_porsche()
+        except Exception:  # noqa: BLE001
+            _LOG.exception("Fehler im Porsche-Loop")
+        await asyncio.sleep(config.PORSCHE_POLL_SECONDS)
+
+
+async def _tick_porsche() -> None:
+    creds = db.get_credentials(decrypted=True)
+    settings = db.get_settings()
+    runtime = db.get_runtime_state()
+    now = datetime.now(timezone.utc)
+
+    try:
+        status = await porsche_client.check_status(
+            creds["porsche_email"], creds["porsche_password"], creds["porsche_session"], creds["porsche_vin"]
+        )
+    except porsche_client.PorscheError as exc:
+        LIVE["porsche_error"] = str(exc)
+        db.add_event("porsche_error", f"Porsche-Connect-Fehler: {exc}")
+        db.update_runtime_state({"last_checked_at": now.isoformat()})
+        return
+
+    db.update_credentials({"porsche_session": status.session_json})
+    LIVE.update(
+        porsche_status=status.status,
+        porsche_battery=status.battery_percent,
+        porsche_error=None,
+        porsche_updated_at=now.isoformat(),
+    )
+    db.update_runtime_state(
+        {"last_porsche_status": status.status, "last_checked_at": now.isoformat()}
+    )
+
+    error_since = _parse_ts(runtime["porsche_error_since"])
+    last_reboot = _parse_ts(runtime["last_reboot_at"])
+
+    if status.is_error:
+        if error_since is None:
+            db.update_runtime_state({"porsche_error_since": now.isoformat()})
+            db.add_event("charge_error_detected", f"Ladefehler erkannt (Status: {status.status})")
+        else:
+            cooldown_min = settings["reboot_cooldown_min"]
+            cooldown_ok = last_reboot is None or (now - last_reboot).total_seconds() / 60 >= cooldown_min
+            if cooldown_ok:
+                try:
+                    await easee_client.reboot(
+                        creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
+                    )
+                    db.update_runtime_state(
+                        {"last_reboot_at": now.isoformat(), "porsche_error_since": None}
+                    )
+                    db.add_event("reboot", "Wallbox nach anhaltendem Ladefehler automatisch neu gebootet")
+                except easee_client.EaseeError as exc:
+                    db.add_event("reboot_failed", f"Automatischer Reboot fehlgeschlagen: {exc}")
+    elif error_since is not None:
+        db.update_runtime_state({"porsche_error_since": None})
+        db.add_event("charge_error_cleared", f"Ladefehler nicht mehr aktiv (Status: {status.status})")
+
+
+async def _forecast_loop() -> None:
+    while True:
+        try:
+            await _tick_forecast()
+        except Exception:  # noqa: BLE001
+            _LOG.exception("Fehler im Forecast-Loop")
+        await asyncio.sleep(config.FORECAST_POLL_SECONDS)
+
+
+async def _tick_forecast() -> None:
+    settings = db.get_settings()
+    try:
+        days = await forecast_client.get_forecast(settings["lat"], settings["lon"])
+        LIVE["forecast"] = [d.__dict__ for d in days]
+        LIVE["forecast_error"] = None
+    except forecast_client.ForecastError as exc:
+        LIVE["forecast_error"] = str(exc)
+
+
+async def manual_reboot() -> None:
+    creds = db.get_credentials(decrypted=True)
+    await easee_client.reboot(creds["easee_email"], creds["easee_password"], creds["easee_charger_id"])
+    db.add_event("reboot", "Wallbox manuell neu gebootet")
+
+
+_tasks: list[asyncio.Task] = []
+
+
+def start() -> None:
+    _tasks.append(asyncio.create_task(_solar_easee_loop()))
+    _tasks.append(asyncio.create_task(_porsche_loop()))
+    _tasks.append(asyncio.create_task(_forecast_loop()))
+
+
+def stop() -> None:
+    for task in _tasks:
+        task.cancel()

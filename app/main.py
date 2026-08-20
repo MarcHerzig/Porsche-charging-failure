@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+from . import db, scheduler
+from .integrations.easee_client import EaseeError
+
+BASE_DIR = Path(__file__).parent
+
+app = FastAPI(title="Porsche Solar Charge Guard")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    scheduler.start()
+
+
+@app.on_event("shutdown")
+async def _shutdown() -> None:
+    scheduler.stop()
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse(request, "index.html", {})
+
+
+@app.get("/api/live")
+async def get_live():
+    return scheduler.LIVE
+
+
+@app.get("/api/settings")
+async def get_settings():
+    return db.get_settings()
+
+
+class SettingsUpdate(BaseModel):
+    mode: str | None = None
+    threshold_w: float | None = None
+    start_debounce_min: int | None = None
+    stop_debounce_min: int | None = None
+    curfew_enabled: bool | None = None
+    curfew_start: str | None = None
+    curfew_end: str | None = None
+    reboot_cooldown_min: int | None = None
+    lat: float | None = None
+    lon: float | None = None
+
+
+@app.post("/api/settings")
+async def update_settings(payload: SettingsUpdate):
+    fields = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if "curfew_enabled" in fields:
+        fields["curfew_enabled"] = int(fields["curfew_enabled"])
+    db.update_settings(fields)
+    return db.get_settings()
+
+
+@app.get("/api/credentials")
+async def get_credentials():
+    return db.get_credentials(decrypted=False)
+
+
+class CredentialsUpdate(BaseModel):
+    porsche_email: str | None = None
+    porsche_password: str | None = None
+    porsche_vin: str | None = None
+    easee_email: str | None = None
+    easee_password: str | None = None
+    easee_charger_id: str | None = None
+    solar_base_url: str | None = None
+    solar_api_key: str | None = None
+
+
+@app.post("/api/credentials")
+async def update_credentials(payload: CredentialsUpdate):
+    fields = {k: v for k, v in payload.model_dump().items() if v is not None and v != ""}
+    db.update_credentials(fields)
+    db.add_event("credentials_updated", "Zugangsdaten aktualisiert")
+    return db.get_credentials(decrypted=False)
+
+
+@app.get("/api/log")
+async def get_log(limit: int = 15):
+    return db.get_events(limit=limit)
+
+
+@app.post("/api/reboot")
+async def reboot():
+    try:
+        await scheduler.manual_reboot()
+    except EaseeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"ok": True}

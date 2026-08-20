@@ -1,0 +1,16 @@
+services:
+  porsche-charge-guard:
+    build: .
+    # image: ghcr.io/marcherzig/porsche-charching-failure:latest
+    container_name: porsche-charge-guard
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATA_DIR=/data
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+    volumes:
+      - porsche-charge-data:/data
+
+volumes:
+  porsche-charge-data:
