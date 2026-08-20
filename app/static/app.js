@@ -61,9 +61,11 @@ async function refreshLive() {
   $("easee-state").textContent = data.easee_op_mode
     ? `${data.easee_op_mode}${data.easee_reason ? " / " + data.easee_reason : ""}`
     : "–";
-  $("porsche-state").textContent = data.porsche_status
-    ? `${porscheIcon(data.porsche_status, !!data.porsche_error)} ${data.porsche_status}`
-    : `${porscheIcon(null, !!data.porsche_error)} –`;
+  $("porsche-state").textContent = data.porsche_captcha_pending
+    ? "🧩 Captcha noetig -- im Zugangsdaten-Tab loesen"
+    : data.porsche_status
+      ? `${porscheIcon(data.porsche_status, !!data.porsche_error)} ${data.porsche_status}`
+      : `${porscheIcon(null, !!data.porsche_error)} –`;
 
   $("porsche-battery-stat").textContent = data.porsche_battery != null ? `${Math.round(data.porsche_battery)}%` : "–";
 
@@ -173,21 +175,31 @@ async function saveCredentials() {
     porsche_email: $("porsche-email").value,
     porsche_password: $("porsche-password").value,
     porsche_vin: $("porsche-vin").value,
+    porsche_session: $("porsche-session").value,
     easee_email: $("easee-email").value,
     easee_password: $("easee-password").value,
     easee_charger_id: $("easee-charger-id").value,
     solar_manager_id: $("solar-manager-id").value,
     solar_api_key: $("solar-api-key").value,
   };
-  await fetch("/api/credentials", {
+  const res = await fetch("/api/credentials", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    $("credentials-saved").textContent = "Fehler: " + (body.detail || `HTTP ${res.status}`);
+    $("credentials-saved").style.color = "var(--error)";
+    return;
+  }
+
   $("porsche-password").value = "";
+  $("porsche-session").value = "";
   $("easee-password").value = "";
   $("solar-api-key").value = "";
+  $("credentials-saved").style.color = "var(--ok)";
   $("credentials-saved").textContent = "Gespeichert ✓";
   setTimeout(() => ($("credentials-saved").textContent = ""), 2000);
   testConnections();
@@ -209,9 +221,65 @@ async function testOne(ledId, endpoint) {
 }
 
 function testConnections() {
-  testOne("led-porsche", "/api/test/porsche");
+  testOne("led-porsche", "/api/test/porsche").then(checkPorscheCaptcha);
   testOne("led-easee", "/api/test/easee");
   testOne("led-solar", "/api/test/solar");
+}
+
+async function checkPorscheCaptcha() {
+  const res = await fetch("/api/porsche/captcha");
+  const body = await res.json();
+  showCaptcha(body.image);
+}
+
+function showCaptcha(image) {
+  const box = $("captcha-box");
+  if (image) {
+    box.style.display = "block";
+    $("captcha-image").src = image;
+  } else {
+    box.style.display = "none";
+  }
+}
+
+async function submitCaptcha() {
+  const code = $("captcha-code").value.trim();
+  if (!code) return;
+  $("captcha-hint").textContent = "Wird geprueft...";
+  try {
+    const res = await fetch("/api/porsche/captcha", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    const body = await res.json();
+    if (body.ok) {
+      $("captcha-hint").textContent = "Login erfolgreich ✓";
+      $("captcha-code").value = "";
+      showCaptcha(null);
+      testConnections();
+    } else if (body.captcha_needed) {
+      $("captcha-hint").textContent = "Falscher Code -- neues Captcha, bitte erneut versuchen.";
+      $("captcha-code").value = "";
+      showCaptcha(body.image);
+    } else {
+      $("captcha-hint").textContent = "Fehler: " + (body.detail || "unbekannt");
+    }
+  } catch (err) {
+    $("captcha-hint").textContent = "Fehler: " + err.message;
+  }
+}
+
+async function doRefresh() {
+  const btn = $("refresh-btn");
+  btn.classList.add("spinning");
+  try {
+    await fetch("/api/refresh", { method: "POST" });
+  } catch (err) {
+    // ignoriert -- refreshLive() zeigt danach ohnehin den aktuellen Fehlerstatus
+  }
+  await refreshLive();
+  btn.classList.remove("spinning");
 }
 
 async function doGeocode() {
@@ -265,6 +333,11 @@ function init() {
   $("save-credentials").addEventListener("click", saveCredentials);
   $("reboot-btn").addEventListener("click", doReboot);
   $("geocode-btn").addEventListener("click", doGeocode);
+  $("refresh-btn").addEventListener("click", doRefresh);
+  $("captcha-submit-btn").addEventListener("click", submitCaptcha);
+  $("captcha-code").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitCaptcha();
+  });
 
   setInterval(refreshLive, 10000);
   setInterval(refreshLog, 15000);

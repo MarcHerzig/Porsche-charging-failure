@@ -15,11 +15,10 @@ send a request, as the client has been closed."). Deshalb wird hier ein
 eigener, dauerhafter httpx.AsyncClient erzeugt und nicht nach jedem Call
 geschlossen.
 
-Falls Porsche fuer den Account/die IP doch ein Captcha verlangt, schlaegt der
-Login mit einer PorscheExceptionError fehl -- dieser Fall wird nach oben
-durchgereicht und im Log/GUI sichtbar gemacht, inkl. Hinweis auf den
-manuellen Fallback (Session-Datei extern per `porschecli` erzeugen und
-Token-JSON in den Zugangsdaten-Tab einfuegen).
+Verlangt Porsche fuer den Login-Versuch ein Captcha, wird das Captcha-Bild
+gespeichert und ueber `get_pending_captcha_image()`/`submit_captcha()` der
+GUI zur Verfuegung gestellt -- der Login wird also direkt in der App geloest,
+ohne externe CLI.
 """
 
 from __future__ import annotations
@@ -31,8 +30,13 @@ from dataclasses import dataclass
 import httpx
 from pyporscheconnectapi.account import PorscheConnectAccount
 from pyporscheconnectapi.connection import Connection
-from pyporscheconnectapi.exceptions import PorscheExceptionError
+from pyporscheconnectapi.exceptions import (
+    PorscheCaptchaRequiredError,
+    PorscheExceptionError,
+    PorscheWrongCredentialsError,
+)
 
+AUTH_SERVER = "https://identity.porsche.com"
 CHARGING_STATES = {"CHARGING", "INSTANT_CHARGING", "INITIALISING"}
 ERROR_STATES = {"CHARGING_ERROR"}
 
@@ -40,10 +44,19 @@ _lock = asyncio.Lock()
 _cached_key: tuple[str, str] | None = None
 _cached_connection: Connection | None = None
 _cached_controller: PorscheConnectAccount | None = None
+_pending_captcha: dict | None = None
 
 
 class PorscheError(Exception):
     pass
+
+
+class PorscheCaptchaNeeded(PorscheError):
+    """Login blockiert, bis das per `image` angezeigte Captcha geloest wird."""
+
+    def __init__(self, image: str) -> None:
+        self.image = image
+        super().__init__("Porsche verlangt ein Captcha zum Einloggen.")
 
 
 @dataclass
@@ -58,15 +71,25 @@ class PorscheStatus:
     session_json: str
 
 
-async def _get_controller(email: str, password: str, session_json: str | None):
-    global _cached_key, _cached_connection, _cached_controller
+def _normalize_captcha_image(image: str) -> str:
+    if image.startswith("data:") or image.startswith("http"):
+        return image
+    return f"{AUTH_SERVER}{image}"
 
+
+async def _set_controller(email: str, password: str, connection: Connection, controller: PorscheConnectAccount) -> None:
+    global _cached_key, _cached_connection, _cached_controller
+    if _cached_connection is not None and _cached_connection is not connection:
+        await _cached_connection.close()
+    _cached_key = (email, password)
+    _cached_connection = connection
+    _cached_controller = controller
+
+
+async def _get_controller(email: str, password: str, session_json: str | None):
     async with _lock:
         if _cached_controller is not None and _cached_key == (email, password):
             return _cached_connection, _cached_controller
-
-        if _cached_connection is not None:
-            await _cached_connection.close()
 
         token = json.loads(session_json) if session_json else {}
         # Eigener Client, statt auf pyporscheconnectapi's geteilten Default
@@ -74,10 +97,7 @@ async def _get_controller(email: str, password: str, session_json: str | None):
         client = httpx.AsyncClient()
         connection = Connection(email, password, async_client=client, token=token)
         controller = PorscheConnectAccount(connection=connection)
-
-        _cached_key = (email, password)
-        _cached_connection = connection
-        _cached_controller = controller
+        await _set_controller(email, password, connection, controller)
         return connection, controller
 
 
@@ -88,52 +108,107 @@ async def _invalidate() -> None:
     _cached_key, _cached_connection, _cached_controller = None, None, None
 
 
+async def _fetch_status(connection: Connection, controller: PorscheConnectAccount, vin: str | None) -> PorscheStatus:
+    vehicles = await controller.get_vehicles()
+    if not vehicles:
+        raise PorscheError("Kein Fahrzeug im Porsche-Connect-Account gefunden.")
+
+    vehicle = next((v for v in vehicles if v.vin == vin), None) if vin else vehicles[0]
+    if vehicle is None:
+        raise PorscheError(f"Kein Fahrzeug mit VIN '{vin}' gefunden.")
+
+    await vehicle.get_stored_overview()
+    summary = vehicle.data.get("CHARGING_SUMMARY", {}) or {}
+    status = (summary.get("status") or "UNKNOWN").upper()
+    battery = vehicle.data.get("BATTERY_LEVEL", {}).get("percent")
+    lat, lon, _heading = vehicle.location
+
+    return PorscheStatus(
+        vin=vehicle.vin,
+        status=status,
+        is_error=status in ERROR_STATES or "ERROR" in status,
+        is_charging=status in CHARGING_STATES,
+        battery_percent=battery,
+        lat=lat,
+        lon=lon,
+        session_json=json.dumps(connection.token),
+    )
+
+
 async def check_status(
     email: str,
     password: str,
     session_json: str | None,
     vin: str | None = None,
 ) -> PorscheStatus:
+    global _pending_captcha
+
     if not email or not password:
         raise PorscheError("Porsche-Zugangsdaten fehlen.")
 
     connection, controller = await _get_controller(email, password, session_json)
 
     try:
-        vehicles = await controller.get_vehicles()
-        if not vehicles:
-            raise PorscheError("Kein Fahrzeug im Porsche-Connect-Account gefunden.")
-
-        vehicle = next((v for v in vehicles if v.vin == vin), None) if vin else vehicles[0]
-        if vehicle is None:
-            raise PorscheError(f"Kein Fahrzeug mit VIN '{vin}' gefunden.")
-
-        await vehicle.get_stored_overview()
-        summary = vehicle.data.get("CHARGING_SUMMARY", {}) or {}
-        status = (summary.get("status") or "UNKNOWN").upper()
-        battery = vehicle.data.get("BATTERY_LEVEL", {}).get("percent")
-        lat, lon, _heading = vehicle.location
-
-        is_error = status in ERROR_STATES or "ERROR" in status
-        is_charging = status in CHARGING_STATES
-
-        return PorscheStatus(
-            vin=vehicle.vin,
-            status=status,
-            is_error=is_error,
-            is_charging=is_charging,
-            battery_percent=battery,
-            lat=lat,
-            lon=lon,
-            session_json=json.dumps(connection.token),
-        )
+        status = await _fetch_status(connection, controller, vin)
+        _pending_captcha = None
+        return status
     except PorscheError:
         raise
+    except PorscheCaptchaRequiredError as exc:
+        await _invalidate()
+        image = _normalize_captcha_image(exc.captcha)
+        _pending_captcha = {"image": image, "state": exc.state, "email": email, "password": password}
+        raise PorscheCaptchaNeeded(image) from exc
+    except PorscheWrongCredentialsError as exc:
+        await _invalidate()
+        raise PorscheError("Porsche-Login abgelehnt: Email/Passwort falsch.") from exc
     except PorscheExceptionError as exc:
         await _invalidate()
-        raise PorscheError(f"Porsche-Connect-API-Fehler (evtl. Captcha/Login-Problem): {exc}") from exc
+        raise PorscheError(f"Porsche-Connect-API-Fehler: {exc.message or exc}") from exc
     except Exception as exc:  # noqa: BLE001 - z.B. der geteilte-Client-Bug oben
         await _invalidate()
+        raise PorscheError(f"Unerwarteter Porsche-Connect-Fehler: {exc}") from exc
+
+
+def get_pending_captcha_image() -> str | None:
+    return _pending_captcha["image"] if _pending_captcha else None
+
+
+async def submit_captcha(code: str, vin: str | None = None) -> PorscheStatus:
+    global _pending_captcha
+
+    if not _pending_captcha:
+        raise PorscheError("Kein offener Captcha-Vorgang.")
+    if not code:
+        raise PorscheError("Bitte den Captcha-Code eingeben.")
+
+    email = _pending_captcha["email"]
+    password = _pending_captcha["password"]
+    state = _pending_captcha["state"]
+
+    client = httpx.AsyncClient()
+    connection = Connection(email, password, captcha_code=code, state=state, async_client=client, token={})
+    controller = PorscheConnectAccount(connection=connection)
+
+    try:
+        status = await _fetch_status(connection, controller, vin)
+        await _set_controller(email, password, connection, controller)
+        _pending_captcha = None
+        return status
+    except PorscheCaptchaRequiredError as exc:
+        await connection.close()
+        image = _normalize_captcha_image(exc.captcha)
+        _pending_captcha = {"image": image, "state": exc.state, "email": email, "password": password}
+        raise PorscheCaptchaNeeded(image) from exc
+    except PorscheWrongCredentialsError as exc:
+        await connection.close()
+        _pending_captcha = None
+        raise PorscheError("Porsche-Login abgelehnt: Email/Passwort falsch.") from exc
+    except PorscheExceptionError as exc:
+        await connection.close()
+        raise PorscheError(f"Falscher Captcha-Code oder Porsche-Fehler: {exc.message or exc}") from exc
+    except Exception as exc:  # noqa: BLE001
+        await connection.close()
         raise PorscheError(f"Unerwarteter Porsche-Connect-Fehler: {exc}") from exc
 
 

@@ -33,6 +33,7 @@ LIVE: dict = {
     "porsche_connected": None,
     "porsche_distance_km": None,
     "porsche_is_home": None,
+    "porsche_captcha_pending": False,
     "forecast": [],
     "forecast_error": None,
     "charging_active": None,
@@ -151,9 +152,18 @@ async def _tick_porsche() -> None:
         status = await porsche_client.check_status(
             creds["porsche_email"], creds["porsche_password"], creds["porsche_session"], creds["porsche_vin"]
         )
+        LIVE["porsche_captcha_pending"] = False
+    except porsche_client.PorscheCaptchaNeeded as exc:
+        LIVE["porsche_error"] = str(exc)
+        LIVE["porsche_connected"] = False
+        LIVE["porsche_captcha_pending"] = True
+        db.add_event("porsche_captcha", "Porsche verlangt ein Captcha -- im Zugangsdaten-Tab loesen")
+        db.update_runtime_state({"last_checked_at": now.isoformat()})
+        return
     except porsche_client.PorscheError as exc:
         LIVE["porsche_error"] = str(exc)
         LIVE["porsche_connected"] = False
+        LIVE["porsche_captcha_pending"] = False
         db.add_event("porsche_error", f"Porsche-Connect-Fehler: {exc}")
         db.update_runtime_state({"last_checked_at": now.isoformat()})
         return
@@ -226,6 +236,14 @@ async def _tick_forecast() -> None:
 
 async def refresh_forecast() -> None:
     await _tick_forecast()
+
+
+async def refresh_solar_easee() -> None:
+    await _tick_solar_easee()
+
+
+async def refresh_porsche() -> None:
+    await _tick_porsche()
 
 
 async def manual_reboot() -> None:

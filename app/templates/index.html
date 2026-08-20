@@ -26,7 +26,10 @@
     <section id="tab-dashboard" class="tab active">
       <div class="grid">
         <div class="card card-live">
-          <h2><span class="dot" id="status-dot"></span>Live</h2>
+          <h2>
+            <span class="dot" id="status-dot"></span>Live
+            <button class="btn-refresh" id="refresh-btn" type="button" title="Jetzt aktualisieren">🔄</button>
+          </h2>
           <div class="stat-row">
             <div class="stat">
               <span class="stat-icon">☀️</span>
@@ -140,6 +143,31 @@
           <label class="field">Email <input type="text" id="porsche-email" autocomplete="off" /></label>
           <label class="field">Passwort <input type="password" id="porsche-password" autocomplete="new-password" /></label>
           <label class="field">VIN (optional, leer = erstes Fahrzeug) <input type="text" id="porsche-vin" /></label>
+
+          <div id="captcha-box" class="captcha-box" style="display:none">
+            <p class="hint">Porsche verlangt ein Captcha zum Einloggen:</p>
+            <img id="captcha-image" alt="Captcha" />
+            <label class="field">Captcha-Code
+              <input type="text" id="captcha-code" autocomplete="off" />
+            </label>
+            <button class="btn-outline" id="captcha-submit-btn" type="button">Captcha loesen</button>
+            <p id="captcha-hint" class="hint"></p>
+          </div>
+
+          <details class="fallback">
+            <summary>Alternative: Session-Token manuell einfuegen</summary>
+            <p class="hint">
+              Falls das Captcha-Bild oben nicht laedt, einmalig lokal (von
+              deinem normalen Internetanschluss, nicht aus der Cloud)
+              einloggen:
+            </p>
+            <pre class="code-block">pip install "pyporscheconnectapi&gt;=0.2.7"
+porschecli -e DEINE@EMAIL -s porsche.session list</pre>
+            <p class="hint">Danach den Inhalt der Datei <code>porsche.session</code> hier einfuegen:</p>
+            <label class="field">Session-Token (JSON)
+              <textarea id="porsche-session" rows="3" placeholder='{"access_token": "...", "refresh_token": "...", ...}'></textarea>
+            </label>
+          </details>
         </div>
 
         <div class="card">

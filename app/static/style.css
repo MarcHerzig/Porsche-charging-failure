@@ -126,6 +126,22 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
 
 .card h2 small { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
 
+.btn-refresh {
+  margin: 0 0 0 auto;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.9rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.btn-refresh:hover { color: var(--text); border-color: var(--accent); background: transparent; }
+.btn-refresh.spinning { animation: spin 0.8s linear infinite; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--ok);
@@ -219,7 +235,7 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
 
 label.field > input { margin-top: 0.35rem; }
 
-input[type="text"], input[type="password"], input[type="number"], input[type="time"] {
+input[type="text"], input[type="password"], input[type="number"], input[type="time"], textarea {
   background: var(--bg-alt);
   border: 1px solid var(--border);
   color: var(--text);
@@ -227,11 +243,36 @@ input[type="text"], input[type="password"], input[type="number"], input[type="ti
   border-radius: 8px;
   font-size: 0.9rem;
   width: 100%;
+  font-family: inherit;
 }
 
-input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus, input[type="time"]:focus {
+textarea { font-family: monospace; font-size: 0.78rem; resize: vertical; }
+
+input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus, input[type="time"]:focus, textarea:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.captcha-box {
+  margin-top: 0.9rem;
+  padding: 0.9rem;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  background: rgba(232, 178, 61, 0.08);
+}
+.captcha-box img { display: block; max-width: 100%; border-radius: 6px; margin: 0.5rem 0; background: #fff; }
+
+.fallback { margin-top: 0.9rem; font-size: 0.85rem; }
+.fallback summary { cursor: pointer; color: var(--muted); }
+.fallback summary:hover { color: var(--text); }
+.code-block {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.78rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
 }
 
 input[type="range"] {

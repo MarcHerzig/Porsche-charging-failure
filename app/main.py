@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import time
 from pathlib import Path
 
@@ -85,6 +87,7 @@ class CredentialsUpdate(BaseModel):
     porsche_email: str | None = None
     porsche_password: str | None = None
     porsche_vin: str | None = None
+    porsche_session: str | None = None
     easee_email: str | None = None
     easee_password: str | None = None
     easee_charger_id: str | None = None
@@ -95,8 +98,18 @@ class CredentialsUpdate(BaseModel):
 @app.post("/api/credentials")
 async def update_credentials(payload: CredentialsUpdate):
     fields = {k: v for k, v in payload.model_dump().items() if v is not None and v != ""}
+    if "porsche_session" in fields:
+        try:
+            json.loads(fields["porsche_session"])
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"Session-Token ist kein gueltiges JSON: {exc}") from exc
     db.update_credentials(fields)
     db.add_event("credentials_updated", "Zugangsdaten aktualisiert")
+    # Sofort einen Check ausloesen, statt auf den naechsten Poll (bis zu 15
+    # Min bei Porsche) zu warten -- das Dashboard soll nach dem Speichern
+    # zeitnah aktuelle Werte zeigen.
+    asyncio.create_task(scheduler.refresh_solar_easee())
+    asyncio.create_task(scheduler.refresh_porsche())
     return db.get_credentials(decrypted=False)
 
 
@@ -148,9 +161,46 @@ async def test_porsche():
         return {"ok": False, "detail": str(exc)}
 
 
+@app.get("/api/porsche/captcha")
+async def get_porsche_captcha():
+    return {"image": porsche_client.get_pending_captcha_image()}
+
+
+class CaptchaSubmit(BaseModel):
+    code: str
+
+
+@app.post("/api/porsche/captcha")
+async def submit_porsche_captcha(payload: CaptchaSubmit):
+    creds = db.get_credentials(decrypted=True)
+    try:
+        status = await porsche_client.submit_captcha(payload.code, creds["porsche_vin"])
+    except porsche_client.PorscheCaptchaNeeded as exc:
+        return {"ok": False, "captcha_needed": True, "image": exc.image}
+    except porsche_client.PorscheError as exc:
+        return {"ok": False, "captcha_needed": False, "detail": str(exc)}
+
+    db.update_credentials({"porsche_session": status.session_json})
+    scheduler.LIVE.update(
+        porsche_status=status.status,
+        porsche_battery=status.battery_percent,
+        porsche_error=None,
+        porsche_connected=True,
+        porsche_captcha_pending=False,
+    )
+    db.add_event("porsche_captcha_solved", "Captcha geloest, Porsche-Login erfolgreich")
+    return {"ok": True}
+
+
 @app.get("/api/log")
 async def get_log(limit: int = 15):
     return db.get_events(limit=limit)
+
+
+@app.post("/api/refresh")
+async def refresh_live():
+    await asyncio.gather(scheduler.refresh_solar_easee(), scheduler.refresh_porsche())
+    return {"ok": True}
 
 
 @app.post("/api/reboot")
