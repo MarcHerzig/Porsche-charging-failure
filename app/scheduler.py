@@ -134,21 +134,26 @@ async def _tick_solar_easee() -> None:
 
     if decision.changed:
         try:
+            device_id = await solar_client.find_car_charger_device_id(
+                creds["solar_manager_id"], creds["solar_api_key"]
+            )
+            target_mode = (
+                solar_client.CHARGING_MODE_FAST
+                if decision.charging_active
+                else solar_client.CHARGING_MODE_DO_NOT_CHARGE
+            )
+            await solar_client.set_car_charger_mode(
+                creds["solar_manager_id"], creds["solar_api_key"], device_id, target_mode
+            )
             if decision.charging_active:
-                await easee_client.start_charging(
-                    creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
-                )
                 db.add_event("charge_start", f"Laden gestartet ({decision.reason})")
             else:
-                await easee_client.stop_charging(
-                    creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
-                )
                 db.add_event("charge_stop", f"Laden gestoppt ({decision.reason})")
             db.update_runtime_state({"charging_active": int(decision.charging_active)})
-            LIVE["easee_error"] = None
-        except easee_client.EaseeError as exc:
-            LIVE["easee_error"] = str(exc)
-            db.add_event("easee_error", f"Easee-Befehl fehlgeschlagen: {exc}")
+            LIVE["solar_error"] = None
+        except solar_client.SolarManagerError as exc:
+            LIVE["solar_error"] = str(exc)
+            db.add_event("solar_manager_error", f"Solar-Manager-Befehl fehlgeschlagen: {exc}")
 
     try:
         state = await easee_client.get_state(
