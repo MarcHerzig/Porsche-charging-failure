@@ -72,9 +72,12 @@ def evaluate(
     if raw_should_charge != prev_charging_active:
         elapsed_min = (now - condition_since).total_seconds() / 60
         required_min = settings["start_debounce_min"] if raw_should_charge else settings["stop_debounce_min"]
-        # Sperrzone soll sofort greifen, nicht erst nach der Stop-Hysterese.
+        # Sperrzone und der "Immer laden"-Modus sind bewusste Uebersteuerungen
+        # und sollen sofort greifen -- die Hysterese ist nur gegen PV-Flattern
+        # im Smart-Modus gedacht, nicht fuer einen manuellen Moduswechsel.
         is_curfew_stop = mode == "smart" and settings["curfew_enabled"] and not raw_should_charge and "Sperrzone" in reason
-        if is_curfew_stop or elapsed_min >= required_min:
+        is_instant = is_curfew_stop or mode == "always"
+        if is_instant or elapsed_min >= required_min:
             changed = True
 
     charging_active = raw_should_charge if changed else prev_charging_active

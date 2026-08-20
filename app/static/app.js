@@ -16,6 +16,14 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleString("de-CH");
 }
 
+function porscheIcon(status, isError) {
+  if (isError) return "🚨";
+  if (!status) return "🚗";
+  if (status.includes("CHARGING") || status === "INITIALISING") return "🔌⚡";
+  if (status === "COMPLETED") return "🔋";
+  return "🚗";
+}
+
 function weatherIcon(day) {
   if (day.precipitation_mm >= 1) return "🌧️";
   if (day.sunshine_hours >= 7) return "☀️";
@@ -53,8 +61,8 @@ async function refreshLive() {
     ? `${data.easee_op_mode}${data.easee_reason ? " / " + data.easee_reason : ""}`
     : "–";
   $("porsche-state").textContent = data.porsche_status
-    ? `${data.porsche_status}${data.porsche_battery != null ? " (" + data.porsche_battery + "%)" : ""}`
-    : "–";
+    ? `${porscheIcon(data.porsche_status, !!data.porsche_error)} ${data.porsche_status}${data.porsche_battery != null ? " (" + data.porsche_battery + "%)" : ""}`
+    : `${porscheIcon(null, !!data.porsche_error)} –`;
 
   const errors = [data.solar_error, data.easee_error, data.porsche_error].filter(Boolean);
   $("live-errors").textContent = errors.join(" | ");
