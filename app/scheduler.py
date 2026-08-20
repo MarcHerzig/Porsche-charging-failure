@@ -134,12 +134,12 @@ async def _tick_solar_easee() -> None:
     if decision.changed:
         try:
             if decision.charging_active:
-                await easee_client.resume_charging(
+                await easee_client.start_charging(
                     creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
                 )
                 db.add_event("charge_start", f"Laden gestartet ({decision.reason})")
             else:
-                await easee_client.pause_charging(
+                await easee_client.stop_charging(
                     creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
                 )
                 db.add_event("charge_stop", f"Laden gestoppt ({decision.reason})")
