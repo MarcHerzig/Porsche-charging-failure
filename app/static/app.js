@@ -79,13 +79,10 @@ async function refreshLive() {
   const easeeBadge = $("easee-badge");
   $("easee-op-mode").textContent = data.easee_op_mode || "–";
   if (data.easee_op_mode == null) {
-    $("easee-reason-text").textContent = "";
     easeeBadge.className = "status-badge neutral";
   } else if (data.easee_has_current === false) {
-    $("easee-reason-text").textContent = `Kein Strom -- ${data.easee_reason || ""}`;
     easeeBadge.className = "status-badge neutral";
   } else {
-    $("easee-reason-text").textContent = "";
     easeeBadge.className = "status-badge ok";
   }
 
