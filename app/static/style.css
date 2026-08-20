@@ -196,7 +196,7 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
 
 .forecast-day {
   flex: 1;
-  min-width: 100px;
+  min-width: 118px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -226,6 +226,17 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
 }
 
 .fc-sub { font-size: 0.72rem; color: var(--muted); }
+.fc-sun { font-size: 0.68rem; color: var(--muted); margin-top: 0.15rem; white-space: nowrap; }
+
+.sun-coupled-box {
+  margin-top: 0.9rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-alt);
+}
+.sun-coupled-box .checkbox { margin: 0 0 0.5rem; }
+#curfew-solar-preview { color: var(--gold); font-size: 0.8rem; margin: 0.4rem 0 0; }
 
 /* ---------- Forms ---------- */
 .field { display: block; margin: 0.7rem 0; font-size: 0.85rem; color: var(--muted); }

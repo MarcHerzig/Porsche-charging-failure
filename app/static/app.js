@@ -1,4 +1,5 @@
 const $ = (id) => document.getElementById(id);
+let LAST_LIVE = null;
 
 function setupTabs() {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -45,6 +46,7 @@ function renderForecast(days) {
       <span class="fc-icon">${weatherIcon(day)}</span>
       <span class="fc-value">${day.radiation_kwh_m2} kWh/m²</span>
       <span class="fc-sub">${day.sunshine_hours} h Sonne</span>
+      <span class="fc-sun">🌅 ${day.sunrise || "–"} · 🌇 ${day.sunset || "–"}</span>
     `;
     strip.appendChild(el);
   });
@@ -53,6 +55,8 @@ function renderForecast(days) {
 async function refreshLive() {
   const res = await fetch("/api/live");
   const data = await res.json();
+  LAST_LIVE = data;
+  updateCurfewSolarPreview();
 
   $("pv-watts").textContent = data.pv_watts != null ? Math.round(data.pv_watts) : "–";
   $("consumption-watts").textContent = data.consumption_w != null ? Math.round(data.consumption_w) : "–";
@@ -118,6 +122,35 @@ function updateSmartVisibility() {
   $("smart-settings").style.display = mode === "smart" ? "block" : "none";
 }
 
+function updateCurfewModeVisibility() {
+  const coupled = $("curfew-solar-coupled").checked;
+  $("curfew-start").disabled = coupled;
+  $("curfew-end").disabled = coupled;
+  updateCurfewSolarPreview();
+}
+
+function updateCurfewSolarPreview() {
+  const preview = $("curfew-solar-preview");
+  if (!$("curfew-solar-coupled").checked) {
+    preview.textContent = "";
+    return;
+  }
+  const today = (LAST_LIVE?.forecast || [])[0];
+  if (!today || !today.sunrise || !today.sunset) {
+    preview.textContent = "Berechnete Zeiten erscheinen, sobald der Forecast geladen ist.";
+    return;
+  }
+  const offset = Number($("curfew-solar-offset").value) || 0;
+  const shift = (hhmm, deltaMin) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    const d = new Date(2000, 0, 1, h, m + deltaMin);
+    return d.toTimeString().slice(0, 5);
+  };
+  const start = shift(today.sunset, -offset);
+  const end = shift(today.sunrise, offset);
+  preview.textContent = `Heute: Sperrzone ${start} – ${end} (Sonnenuntergang ${today.sunset}, Sonnenaufgang ${today.sunrise})`;
+}
+
 async function loadSettings() {
   const res = await fetch("/api/settings");
   const s = await res.json();
@@ -129,6 +162,8 @@ async function loadSettings() {
   $("curfew-enabled").checked = !!s.curfew_enabled;
   $("curfew-start").value = s.curfew_start;
   $("curfew-end").value = s.curfew_end;
+  $("curfew-solar-coupled").checked = !!s.curfew_solar_coupled;
+  $("curfew-solar-offset").value = s.curfew_solar_offset_min;
   $("reboot-cooldown").value = s.reboot_cooldown_min;
   if (s.lat != null) $("lat").value = s.lat;
   if (s.lon != null) $("lon").value = s.lon;
@@ -138,6 +173,7 @@ async function loadSettings() {
     $("location-resolved").textContent = `Aktuell: ${s.location_name} (${s.lat}, ${s.lon})`;
   }
   updateSmartVisibility();
+  updateCurfewModeVisibility();
 }
 
 async function saveSettings() {
@@ -149,6 +185,8 @@ async function saveSettings() {
     curfew_enabled: $("curfew-enabled").checked,
     curfew_start: $("curfew-start").value,
     curfew_end: $("curfew-end").value,
+    curfew_solar_coupled: $("curfew-solar-coupled").checked,
+    curfew_solar_offset_min: Number($("curfew-solar-offset").value),
     reboot_cooldown_min: Number($("reboot-cooldown").value),
   };
   await fetch("/api/settings", {
@@ -329,6 +367,8 @@ function init() {
     $("threshold-value").textContent = `${$("threshold").value} W`;
   });
   document.querySelectorAll('input[name="mode"]').forEach((el) => el.addEventListener("change", updateSmartVisibility));
+  $("curfew-solar-coupled").addEventListener("change", updateCurfewModeVisibility);
+  $("curfew-solar-offset").addEventListener("input", updateCurfewSolarPreview);
   $("save-settings").addEventListener("click", saveSettings);
   $("save-credentials").addEventListener("click", saveCredentials);
   $("reboot-btn").addEventListener("click", doReboot);

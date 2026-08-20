@@ -7,7 +7,7 @@ sich isoliert nachvollziehen und testen laesst.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time as dtime
+from datetime import datetime, time as dtime, timedelta
 from typing import Any
 
 
@@ -16,10 +16,43 @@ def _parse_hhmm(value: str) -> dtime:
     return dtime(int(hour), int(minute))
 
 
-def in_curfew(now: datetime, curfew_start: str, curfew_end: str) -> bool:
-    start = _parse_hhmm(curfew_start)
-    end = _parse_hhmm(curfew_end)
-    current = now.time()
+def _shift_time(base_date: datetime, t: dtime, delta_min: float) -> dtime:
+    """Verschiebt eine Uhrzeit um delta_min Minuten (kann negativ sein)."""
+    combined = datetime.combine(base_date.date(), t) + timedelta(minutes=delta_min)
+    return combined.time()
+
+
+def effective_curfew_window(
+    local_now: datetime,
+    settings: dict[str, Any],
+    sunrise: dtime | None,
+    sunset: dtime | None,
+) -> tuple[dtime, dtime]:
+    """Ermittelt die tatsaechlich anzuwendende Sperrzone (Von/Bis), in lokaler Zeit.
+
+    Im normalen Fall die manuell eingestellten Werte. Im an Sonnenauf-/
+    -untergang gekoppelten Modus wird die Sperrzone stattdessen aus
+    sunrise/sunset abgeleitet: sie beginnt `curfew_solar_offset_min` Minuten
+    VOR dem Sonnenuntergang (die PV-Leistung reicht kurz davor ohnehin meist
+    nicht mehr fuer den Schwellwert) und endet ebenso viele Minuten NACH dem
+    Sonnenaufgang.
+    """
+    if settings.get("curfew_solar_coupled") and sunrise is not None and sunset is not None:
+        offset = settings.get("curfew_solar_offset_min", 0) or 0
+        start = _shift_time(local_now, sunset, -offset)
+        end = _shift_time(local_now, sunrise, offset)
+        return start, end
+    return _parse_hhmm(settings["curfew_start"]), _parse_hhmm(settings["curfew_end"])
+
+
+def in_curfew(
+    local_now: datetime,
+    settings: dict[str, Any],
+    sunrise: dtime | None = None,
+    sunset: dtime | None = None,
+) -> bool:
+    start, end = effective_curfew_window(local_now, settings, sunrise, sunset)
+    current = local_now.time()
     if start == end:
         return False
     if start < end:
@@ -45,16 +78,27 @@ def evaluate(
     prev_pending_target: bool | None,
     prev_condition_since: datetime | None,
     prev_charging_active: bool,
+    utc_offset_seconds: int = 0,
+    sunrise: dtime | None = None,
+    sunset: dtime | None = None,
 ) -> ControlDecision:
+    """`now` ist der tatsaechliche Zeitpunkt (fuer Hysterese-/Zeitstempel-
+    Buchhaltung, beliebige aware-Zeitzone). Fuer den Sperrzonen-Vergleich
+    (Uhrzeit-basiert) wird daraus mit `utc_offset_seconds` die lokale
+    Wanduhrzeit am Standort berechnet -- die Sperrzone ist in lokaler Zeit
+    gemeint, nicht in UTC.
+    """
     mode = settings["mode"]
+    local_now = now + timedelta(seconds=utc_offset_seconds)
 
     if mode == "always":
         raw_should_charge = True
         reason = "Immer-laden-Modus"
     else:
-        if settings["curfew_enabled"] and in_curfew(now, settings["curfew_start"], settings["curfew_end"]):
+        if settings["curfew_enabled"] and in_curfew(local_now, settings, sunrise, sunset):
+            start, end = effective_curfew_window(local_now, settings, sunrise, sunset)
             raw_should_charge = False
-            reason = f"Sperrzone aktiv ({settings['curfew_start']}-{settings['curfew_end']})"
+            reason = f"Sperrzone aktiv ({start.strftime('%H:%M')}-{end.strftime('%H:%M')})"
         elif pv_watts is None:
             # Keine aktuelle PV-Messung -- sicherheitshalber nicht laden.
             raw_should_charge = False

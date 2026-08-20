@@ -38,7 +38,9 @@ def _init_schema() -> None:
                 reboot_cooldown_min INTEGER NOT NULL DEFAULT 30,
                 lat REAL,
                 lon REAL,
-                location_name TEXT
+                location_name TEXT,
+                curfew_solar_coupled INTEGER NOT NULL DEFAULT 0,
+                curfew_solar_offset_min INTEGER NOT NULL DEFAULT 30
             );
 
             CREATE TABLE IF NOT EXISTS credentials (
@@ -83,6 +85,10 @@ def _init_schema() -> None:
     if "location_name" not in existing_settings_cols:
         with _conn:
             _conn.execute("ALTER TABLE settings ADD COLUMN location_name TEXT")
+    if "curfew_solar_coupled" not in existing_settings_cols:
+        with _conn:
+            _conn.execute("ALTER TABLE settings ADD COLUMN curfew_solar_coupled INTEGER NOT NULL DEFAULT 0")
+            _conn.execute("ALTER TABLE settings ADD COLUMN curfew_solar_offset_min INTEGER NOT NULL DEFAULT 30")
 
     # Migration: solar_base_url (lokale API) -> solar_manager_id (Cloud-API).
     existing_cred_cols = {row[1] for row in _conn.execute("PRAGMA table_info(credentials)")}
@@ -128,6 +134,8 @@ def update_settings(fields: dict[str, Any]) -> None:
         "lat",
         "lon",
         "location_name",
+        "curfew_solar_coupled",
+        "curfew_solar_offset_min",
     }
     fields = {k: v for k, v in fields.items() if k in allowed}
     if not fields:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, time as dtime, timedelta, timezone
 
 from . import config, control, db
 from .integrations import easee_client, forecast_client, porsche_client, solar_client
@@ -36,6 +36,7 @@ LIVE: dict = {
     "porsche_captcha_pending": False,
     "forecast": [],
     "forecast_error": None,
+    "utc_offset_seconds": 0,
     "charging_active": None,
 }
 
@@ -57,6 +58,27 @@ def _parse_ts(value: str | None) -> datetime | None:
     if not value:
         return None
     return datetime.fromisoformat(value)
+
+
+def _parse_hhmm(value: str) -> dtime | None:
+    if not value or ":" not in value:
+        return None
+    hour, minute = value.split(":")
+    return dtime(int(hour), int(minute))
+
+
+def _todays_sun_times() -> tuple[dtime | None, dtime | None]:
+    """Sunrise/Sunset des heutigen Tages (lokale Zeit) aus dem zuletzt
+    geladenen Forecast, falls vorhanden und der erste Eintrag tatsaechlich
+    von heute ist (lokales Datum, ueber utc_offset_seconds bestimmt)."""
+    forecast = LIVE.get("forecast") or []
+    if not forecast:
+        return None, None
+    local_today = (datetime.now(timezone.utc) + timedelta(seconds=LIVE.get("utc_offset_seconds", 0))).date()
+    today_entry = forecast[0]
+    if today_entry.get("date") != local_today.isoformat():
+        return None, None
+    return _parse_hhmm(today_entry.get("sunrise", "")), _parse_hhmm(today_entry.get("sunset", ""))
 
 
 async def _solar_easee_loop() -> None:
@@ -87,6 +109,7 @@ async def _tick_solar_easee() -> None:
     except solar_client.SolarManagerError as exc:
         LIVE["solar_error"] = str(exc)
 
+    sunrise, sunset = _todays_sun_times()
     decision = control.evaluate(
         pv_watts=pv_watts,
         now=now,
@@ -94,6 +117,9 @@ async def _tick_solar_easee() -> None:
         prev_pending_target=bool(runtime["pending_target"]) if runtime["pending_target"] is not None else None,
         prev_condition_since=_parse_ts(runtime["condition_since"]),
         prev_charging_active=bool(runtime["charging_active"]),
+        utc_offset_seconds=LIVE.get("utc_offset_seconds", 0),
+        sunrise=sunrise,
+        sunset=sunset,
     )
     LIVE["charging_active"] = decision.charging_active
 
@@ -227,8 +253,9 @@ async def _forecast_loop() -> None:
 async def _tick_forecast() -> None:
     settings = db.get_settings()
     try:
-        days = await forecast_client.get_forecast(settings["lat"], settings["lon"])
-        LIVE["forecast"] = [d.__dict__ for d in days]
+        result = await forecast_client.get_forecast(settings["lat"], settings["lon"])
+        LIVE["forecast"] = [d.__dict__ for d in result.days]
+        LIVE["utc_offset_seconds"] = result.utc_offset_seconds
         LIVE["forecast_error"] = None
     except forecast_client.ForecastError as exc:
         LIVE["forecast_error"] = str(exc)
