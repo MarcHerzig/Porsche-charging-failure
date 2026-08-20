@@ -59,7 +59,7 @@ async def _tick_solar_easee() -> None:
 
     pv_watts = None
     try:
-        point = await solar_client.get_current_point(creds["solar_base_url"], creds["solar_api_key"])
+        point = await solar_client.get_current_point(creds["solar_manager_id"], creds["solar_api_key"])
         pv_watts = point.production_w
         LIVE.update(
             pv_watts=point.production_w,

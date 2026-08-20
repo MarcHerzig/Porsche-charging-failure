@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from . import db, scheduler
+from .integrations import easee_client, porsche_client, solar_client
 from .integrations.easee_client import EaseeError
 from .integrations.geocode_client import GeocodeError, search as geocode_search
 
@@ -79,7 +80,7 @@ class CredentialsUpdate(BaseModel):
     easee_email: str | None = None
     easee_password: str | None = None
     easee_charger_id: str | None = None
-    solar_base_url: str | None = None
+    solar_manager_id: str | None = None
     solar_api_key: str | None = None
 
 
@@ -104,6 +105,39 @@ async def geocode(payload: GeocodeQuery):
     db.update_settings({"lat": result.lat, "lon": result.lon, "location_name": result.display_name})
     await scheduler.refresh_forecast()
     return {"display_name": result.display_name, "lat": result.lat, "lon": result.lon}
+
+
+@app.post("/api/test/solar")
+async def test_solar():
+    creds = db.get_credentials(decrypted=True)
+    try:
+        await solar_client.get_current_point(creds["solar_manager_id"], creds["solar_api_key"])
+        return {"ok": True}
+    except solar_client.SolarManagerError as exc:
+        return {"ok": False, "detail": str(exc)}
+
+
+@app.post("/api/test/easee")
+async def test_easee():
+    creds = db.get_credentials(decrypted=True)
+    try:
+        await easee_client.get_state(creds["easee_email"], creds["easee_password"], creds["easee_charger_id"])
+        return {"ok": True}
+    except easee_client.EaseeError as exc:
+        return {"ok": False, "detail": str(exc)}
+
+
+@app.post("/api/test/porsche")
+async def test_porsche():
+    creds = db.get_credentials(decrypted=True)
+    try:
+        status = await porsche_client.check_status(
+            creds["porsche_email"], creds["porsche_password"], creds["porsche_session"], creds["porsche_vin"]
+        )
+        db.update_credentials({"porsche_session": status.session_json})
+        return {"ok": True}
+    except porsche_client.PorscheError as exc:
+        return {"ok": False, "detail": str(exc)}
 
 
 @app.get("/api/log")

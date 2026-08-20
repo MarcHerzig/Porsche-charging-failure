@@ -1,10 +1,10 @@
-"""Client fuer die lokale Solar Manager API (GET /v2/point).
+"""Client fuer die Solar Manager Cloud-API (cloud.solar-manager.ch).
 
-Solar Manager Geraete bieten im lokalen Netzwerk einen HTTPS-Endpoint mit
-selbstsigniertem Zertifikat und API-Key-Header. Siehe z.B.
-https://library.loxone.com/detail/solar-manager-local-api-2009 sowie die
-Home-Assistant-Integration https://github.com/bastbu/ha-solarmanager, an der
-sich dieser Client orientiert.
+Verbindung erfolgt ueber die Solar Manager ID (smId) des Geraets plus einem
+API-Key (Header x-api-key), siehe
+https://cloud.solar-manager.ch/swagger.json (Solar Manager External API).
+Der Live-Endpoint /v3/users/{smId}/data/stream liefert dieselben
+Feldnamen (pW, cW, pWh, t) wie die frueher genutzte lokale Geraete-API.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import httpx
 
-ENDPOINT_POINT = "/v2/point"
+API_BASE = "https://cloud.solar-manager.ch"
 TIMEOUT_SECONDS = 10
 
 
@@ -29,17 +29,15 @@ class SolarPoint:
     timestamp: str
 
 
-async def get_current_point(base_url: str, api_key: str) -> SolarPoint:
-    if not base_url:
-        raise SolarManagerError("Keine Solar Manager Base-URL konfiguriert.")
+async def get_current_point(sm_id: str, api_key: str) -> SolarPoint:
+    if not sm_id or not api_key:
+        raise SolarManagerError("Solar Manager ID oder API-Key fehlt.")
 
-    url = f"{base_url.rstrip('/')}{ENDPOINT_POINT}"
-    headers = {"Accept": "application/json"}
-    if api_key:
-        headers["X-API-Key"] = api_key
+    url = f"{API_BASE}/v3/users/{sm_id}/data/stream"
+    headers = {"Accept": "application/json", "x-api-key": api_key}
 
     try:
-        async with httpx.AsyncClient(verify=False, timeout=TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
             response = await client.get(url, headers=headers)
     except httpx.HTTPError as exc:
         raise SolarManagerError(f"Verbindung zu Solar Manager fehlgeschlagen: {exc}") from exc

@@ -7,6 +7,7 @@ function setupTabs() {
       document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
       btn.classList.add("active");
       $(`tab-${btn.dataset.tab}`).classList.add("active");
+      if (btn.dataset.tab === "credentials") testConnections();
     });
   });
 }
@@ -139,7 +140,7 @@ async function loadCredentials() {
   $("porsche-vin").value = c.porsche_vin || "";
   $("easee-email").value = c.easee_email || "";
   $("easee-charger-id").value = c.easee_charger_id || "";
-  $("solar-base-url").value = c.solar_base_url || "";
+  $("solar-manager-id").value = c.solar_manager_id || "";
 }
 
 async function saveCredentials() {
@@ -150,7 +151,7 @@ async function saveCredentials() {
     easee_email: $("easee-email").value,
     easee_password: $("easee-password").value,
     easee_charger_id: $("easee-charger-id").value,
-    solar_base_url: $("solar-base-url").value,
+    solar_manager_id: $("solar-manager-id").value,
     solar_api_key: $("solar-api-key").value,
   };
   await fetch("/api/credentials", {
@@ -164,6 +165,28 @@ async function saveCredentials() {
   $("solar-api-key").value = "";
   $("credentials-saved").textContent = "Gespeichert ✓";
   setTimeout(() => ($("credentials-saved").textContent = ""), 2000);
+  testConnections();
+}
+
+async function testOne(ledId, endpoint) {
+  const led = $(ledId);
+  led.className = "led pending";
+  led.title = "Teste Verbindung...";
+  try {
+    const res = await fetch(endpoint, { method: "POST" });
+    const body = await res.json();
+    led.className = "led " + (body.ok ? "ok" : "fail");
+    led.title = body.ok ? "Verbindung OK" : body.detail || "Verbindung fehlgeschlagen";
+  } catch (err) {
+    led.className = "led fail";
+    led.title = "Fehler: " + err.message;
+  }
+}
+
+function testConnections() {
+  testOne("led-porsche", "/api/test/porsche");
+  testOne("led-easee", "/api/test/easee");
+  testOne("led-solar", "/api/test/solar");
 }
 
 async function doGeocode() {

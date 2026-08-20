@@ -50,7 +50,7 @@ def _init_schema() -> None:
                 easee_email TEXT,
                 easee_password_enc BLOB,
                 easee_charger_id TEXT,
-                solar_base_url TEXT,
+                solar_manager_id TEXT,
                 solar_api_key_enc BLOB
             );
 
@@ -79,10 +79,16 @@ def _init_schema() -> None:
         _conn.execute("INSERT OR IGNORE INTO runtime_state (id) VALUES (1)")
 
     # Leichte Migration fuer bereits bestehende DBs (vor Einfuehrung von location_name).
-    existing_cols = {row[1] for row in _conn.execute("PRAGMA table_info(settings)")}
-    if "location_name" not in existing_cols:
+    existing_settings_cols = {row[1] for row in _conn.execute("PRAGMA table_info(settings)")}
+    if "location_name" not in existing_settings_cols:
         with _conn:
             _conn.execute("ALTER TABLE settings ADD COLUMN location_name TEXT")
+
+    # Migration: solar_base_url (lokale API) -> solar_manager_id (Cloud-API).
+    existing_cred_cols = {row[1] for row in _conn.execute("PRAGMA table_info(credentials)")}
+    if "solar_manager_id" not in existing_cred_cols:
+        with _conn:
+            _conn.execute("ALTER TABLE credentials ADD COLUMN solar_manager_id TEXT")
 
 
 _init_schema()
@@ -149,7 +155,7 @@ def get_credentials(decrypted: bool = False) -> dict[str, Any]:
 
 
 def update_credentials(fields: dict[str, Any]) -> None:
-    plain_allowed = {"porsche_email", "porsche_vin", "easee_email", "easee_charger_id", "solar_base_url"}
+    plain_allowed = {"porsche_email", "porsche_vin", "easee_email", "easee_charger_id", "solar_manager_id"}
     secret_map = {
         "porsche_password": "porsche_password_enc",
         "porsche_session": "porsche_session_enc",

@@ -133,6 +133,24 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
   display: inline-block;
 }
 
+.led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 0.4rem;
+  background: #555;
+  vertical-align: middle;
+}
+.led.pending { background: var(--gold); box-shadow: 0 0 6px var(--gold); animation: pulse 1s infinite; }
+.led.ok { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.led.fail { background: var(--error); box-shadow: 0 0 6px var(--error); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* ---------- Stats ---------- */
 .stat-row { display: flex; gap: 1.5rem; margin-bottom: 1rem; }
 .stat { display: flex; align-items: center; gap: 0.6rem; }
