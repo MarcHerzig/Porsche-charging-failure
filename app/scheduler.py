@@ -232,7 +232,16 @@ async def _tick_porsche() -> None:
         else:
             cooldown_min = settings["reboot_cooldown_min"]
             cooldown_ok = last_reboot is None or (now - last_reboot).total_seconds() / 60 >= cooldown_min
-            if cooldown_ok:
+
+            skip_for_curfew = False
+            if settings["mode"] == "smart" and settings["no_reboot_in_curfew"] and settings["curfew_enabled"]:
+                sunrise, sunset = _todays_sun_times()
+                local_now = now + timedelta(seconds=LIVE.get("utc_offset_seconds", 0))
+                skip_for_curfew = control.in_curfew(local_now, settings, sunrise, sunset)
+
+            if skip_for_curfew:
+                pass  # Reboot bewusst zurueckgehalten, solange die Sperrzone laeuft.
+            elif cooldown_ok:
                 try:
                     await easee_client.reboot(
                         creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]

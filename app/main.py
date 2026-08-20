@@ -72,6 +72,7 @@ class SettingsUpdate(BaseModel):
     location_name: str | None = None
     curfew_solar_coupled: bool | None = None
     curfew_solar_offset_min: int | None = None
+    no_reboot_in_curfew: bool | None = None
 
 
 @app.post("/api/settings")
@@ -81,6 +82,8 @@ async def update_settings(payload: SettingsUpdate):
         fields["curfew_enabled"] = int(fields["curfew_enabled"])
     if "curfew_solar_coupled" in fields:
         fields["curfew_solar_coupled"] = int(fields["curfew_solar_coupled"])
+    if "no_reboot_in_curfew" in fields:
+        fields["no_reboot_in_curfew"] = int(fields["no_reboot_in_curfew"])
     db.update_settings(fields)
     return db.get_settings()
 

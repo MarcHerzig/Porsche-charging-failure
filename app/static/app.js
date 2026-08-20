@@ -223,6 +223,7 @@ async function loadSettings() {
   $("curfew-end").value = s.curfew_end;
   $("curfew-solar-coupled").checked = !!s.curfew_solar_coupled;
   $("curfew-solar-offset").value = s.curfew_solar_offset_min;
+  $("no-reboot-in-curfew").checked = !!s.no_reboot_in_curfew;
   $("reboot-cooldown").value = s.reboot_cooldown_min;
   if (s.lat != null) $("lat").value = s.lat;
   if (s.lon != null) $("lon").value = s.lon;
@@ -246,6 +247,7 @@ async function saveSettings() {
     curfew_end: $("curfew-end").value,
     curfew_solar_coupled: $("curfew-solar-coupled").checked,
     curfew_solar_offset_min: Number($("curfew-solar-offset").value),
+    no_reboot_in_curfew: $("no-reboot-in-curfew").checked,
     reboot_cooldown_min: Number($("reboot-cooldown").value),
   };
   await fetch("/api/settings", {
