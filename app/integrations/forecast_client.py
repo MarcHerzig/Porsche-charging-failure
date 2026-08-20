@@ -25,6 +25,7 @@ class DayForecast:
     date: str
     radiation_kwh_m2: float
     sunshine_hours: float
+    precipitation_mm: float
 
 
 async def get_forecast(lat: float, lon: float, days: int = 5) -> list[DayForecast]:
@@ -34,7 +35,7 @@ async def get_forecast(lat: float, lon: float, days: int = 5) -> list[DayForecas
     params = {
         "latitude": lat,
         "longitude": lon,
-        "daily": "shortwave_radiation_sum,sunshine_duration",
+        "daily": "shortwave_radiation_sum,sunshine_duration,precipitation_sum",
         "timezone": "auto",
         "forecast_days": days,
     }
@@ -52,16 +53,19 @@ async def get_forecast(lat: float, lon: float, days: int = 5) -> list[DayForecas
     dates = daily.get("time", [])
     radiation = daily.get("shortwave_radiation_sum", [])
     sunshine = daily.get("sunshine_duration", [])
+    precipitation = daily.get("precipitation_sum", [])
 
     result = []
     for i, date in enumerate(dates):
         rad_mj = radiation[i] if i < len(radiation) else 0.0
         sun_s = sunshine[i] if i < len(sunshine) else 0.0
+        precip_mm = precipitation[i] if i < len(precipitation) else 0.0
         result.append(
             DayForecast(
                 date=date,
                 radiation_kwh_m2=round((rad_mj or 0.0) / 3.6, 2),
                 sunshine_hours=round((sun_s or 0.0) / 3600, 1),
+                precipitation_mm=round(precip_mm or 0.0, 1),
             )
         )
     return result

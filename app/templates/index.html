@@ -14,7 +14,6 @@
     <div class="hero-inner">
       <div class="wordmark">PORSCHE</div>
       <div class="tagline">SOLAR CHARGE GUARD</div>
-      <div class="stripe"></div>
     </div>
     <nav>
       <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
@@ -104,12 +103,9 @@
           <span id="reboot-hint" class="saved-hint"></span>
         </div>
 
-        <div class="card">
+        <div class="card card-forecast">
           <h2>PV-Forecast <small id="forecast-location"></small></h2>
-          <table id="forecast-table">
-            <thead><tr><th>Tag</th><th>Strahlung (kWh/m²)</th><th>Sonnenstunden</th></tr></thead>
-            <tbody></tbody>
-          </table>
+          <div id="forecast-strip" class="forecast-strip"></div>
           <p id="forecast-error" class="errors"></p>
         </div>
       </div>

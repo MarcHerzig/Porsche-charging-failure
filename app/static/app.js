@@ -16,6 +16,31 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleString("de-CH");
 }
 
+function weatherIcon(day) {
+  if (day.precipitation_mm >= 1) return "🌧️";
+  if (day.sunshine_hours >= 7) return "☀️";
+  if (day.sunshine_hours >= 3) return "⛅";
+  return "☁️";
+}
+
+function renderForecast(days) {
+  const strip = $("forecast-strip");
+  strip.innerHTML = "";
+  days.forEach((day, i) => {
+    const date = new Date(day.date);
+    const label = i === 0 ? "Heute" : date.toLocaleDateString("de-CH", { weekday: "short" });
+    const el = document.createElement("div");
+    el.className = "forecast-day";
+    el.innerHTML = `
+      <span class="fc-label">${label}</span>
+      <span class="fc-icon">${weatherIcon(day)}</span>
+      <span class="fc-value">${day.radiation_kwh_m2} kWh/m²</span>
+      <span class="fc-sub">${day.sunshine_hours} h Sonne</span>
+    `;
+    strip.appendChild(el);
+  });
+}
+
 async function refreshLive() {
   const res = await fetch("/api/live");
   const data = await res.json();
@@ -36,13 +61,7 @@ async function refreshLive() {
   $("status-dot").style.background = errors.length ? "var(--error)" : "var(--ok)";
   $("status-dot").style.boxShadow = errors.length ? "0 0 8px var(--error)" : "0 0 8px var(--ok)";
 
-  const tbody = document.querySelector("#forecast-table tbody");
-  tbody.innerHTML = "";
-  (data.forecast || []).forEach((day) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${day.date}</td><td>${day.radiation_kwh_m2}</td><td>${day.sunshine_hours}</td>`;
-    tbody.appendChild(tr);
-  });
+  renderForecast(data.forecast || []);
   $("forecast-error").textContent = data.forecast_error || "";
 }
 
