@@ -150,35 +150,39 @@ async def reboot(email: str, password: str, charger_id: str) -> None:
 
 
 async def start_charging(email: str, password: str, charger_id: str) -> None:
-    """Startet/autorisiert eine neue Ladesession.
+    """Setzt die Ladesession fort (pyeasee: resume).
 
-    Bewusst `start_charging` statt `resume_charging`: Resume/Pause behalten
-    die Autorisierung der Session bestehen und limitieren nur den Strom auf
-    0 -- das Fahrzeug (insbesondere beobachtet bei Porsche/Easee-Kombis)
-    kann dadurch selbststaendig wieder Strom anfordern und die "Pause"
-    unterlaufen. Start/Stop hingegen erteilt bzw. entzieht die Autorisierung
-    tatsaechlich, das haelt zuverlaessiger.
+    War zwischenzeitlich auf `start`/`stop` (volle Autorisierung erteilen/
+    entziehen) umgestellt, in der Annahme, das Fahrzeug wuerde eine
+    reine Pause selbststaendig unterlaufen. Live beobachtet: selbst ein
+    manuelles Pause in der offiziellen Easee-App wird nach Sekunden wieder
+    aufgehoben -- das Ueberschreiben passiert also nicht wegen unserer
+    API-Wahl, sondern vermutlich weil eine dritte Instanz (am
+    wahrscheinlichsten Solar Manager mit einer eigenen Easee-Ladesteuerung)
+    parallel eigene Befehle an den Charger schickt. Deshalb zurueck auf
+    resume/pause -- funktional gleichwertig, aber die Session bleibt
+    autorisiert und startet nach Sperrzonen-Ende schneller wieder.
     """
     _, charger = await _get_charger(email, password, charger_id)
     try:
-        await charger.start()
+        await charger.resume()
     except EaseeError:
         raise
     except Exception as exc:  # noqa: BLE001
         await _invalidate()
-        raise EaseeError(f"Easee 'start_charging' fehlgeschlagen: {exc}") from exc
+        raise EaseeError(f"Easee 'resume_charging' fehlgeschlagen: {exc}") from exc
 
 
 async def stop_charging(email: str, password: str, charger_id: str) -> None:
-    """Stoppt die Ladesession und entzieht die Autorisierung (siehe start_charging)."""
+    """Pausiert die Ladesession (pyeasee: pause), siehe start_charging."""
     _, charger = await _get_charger(email, password, charger_id)
     try:
-        await charger.stop()
+        await charger.pause()
     except EaseeError:
         raise
     except Exception as exc:  # noqa: BLE001
         await _invalidate()
-        raise EaseeError(f"Easee 'stop_charging' fehlgeschlagen: {exc}") from exc
+        raise EaseeError(f"Easee 'pause_charging' fehlgeschlagen: {exc}") from exc
 
 
 async def close() -> None:
