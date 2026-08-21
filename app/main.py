@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import db, request_log, scheduler
 from .integrations import easee_client, porsche_client, solar_client
@@ -73,6 +73,12 @@ class SettingsUpdate(BaseModel):
     curfew_solar_coupled: bool | None = None
     curfew_solar_offset_min: int | None = None
     no_reboot_in_curfew: bool | None = None
+    # Untergrenzen bewusst konservativ: Solar Manager ist eine leichte Cloud-
+    # API (kein bekanntes Rate-Limit-Problem), Porsche Connect cacht zwar die
+    # Session (siehe integrations/porsche_client.py), ein zu kurzes Intervall
+    # waere trotzdem unnoetig aggressiv gegenueber Porsches Backend.
+    solar_poll_seconds: int | None = Field(default=None, ge=10, le=600)
+    porsche_poll_seconds: int | None = Field(default=None, ge=120, le=21600)
 
 
 @app.post("/api/settings")

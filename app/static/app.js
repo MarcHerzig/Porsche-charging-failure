@@ -227,6 +227,8 @@ async function loadSettings() {
   $("reboot-cooldown").value = s.reboot_cooldown_min;
   if (s.lat != null) $("lat").value = s.lat;
   if (s.lon != null) $("lon").value = s.lon;
+  $("solar-poll-seconds").value = s.solar_poll_seconds;
+  $("porsche-poll-minutes").value = Math.round(s.porsche_poll_seconds / 60);
   $("forecast-location").textContent = s.location_name ? `— ${s.location_name}` : "";
   if (s.location_name) {
     $("location-query").value = s.location_name;
@@ -281,14 +283,26 @@ async function saveCredentials() {
     solar_manager_id: $("solar-manager-id").value,
     solar_api_key: $("solar-api-key").value,
   };
-  const res = await fetch("/api/credentials", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const pollPayload = {
+    solar_poll_seconds: Number($("solar-poll-seconds").value),
+    porsche_poll_seconds: Math.round(Number($("porsche-poll-minutes").value) * 60),
+  };
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
+  const [res, pollRes] = await Promise.all([
+    fetch("/api/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+    fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pollPayload),
+    }),
+  ]);
+
+  if (!res.ok || !pollRes.ok) {
+    const body = await (res.ok ? pollRes : res).json().catch(() => ({}));
     $("credentials-saved").textContent = "Fehler: " + (body.detail || `HTTP ${res.status}`);
     $("credentials-saved").style.color = "var(--error)";
     return;

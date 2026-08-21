@@ -41,7 +41,9 @@ def _init_schema() -> None:
                 location_name TEXT,
                 curfew_solar_coupled INTEGER NOT NULL DEFAULT 0,
                 curfew_solar_offset_min INTEGER NOT NULL DEFAULT 30,
-                no_reboot_in_curfew INTEGER NOT NULL DEFAULT 0
+                no_reboot_in_curfew INTEGER NOT NULL DEFAULT 0,
+                solar_poll_seconds INTEGER NOT NULL DEFAULT 30,
+                porsche_poll_seconds INTEGER NOT NULL DEFAULT 900
             );
 
             CREATE TABLE IF NOT EXISTS credentials (
@@ -93,6 +95,12 @@ def _init_schema() -> None:
     if "no_reboot_in_curfew" not in existing_settings_cols:
         with _conn:
             _conn.execute("ALTER TABLE settings ADD COLUMN no_reboot_in_curfew INTEGER NOT NULL DEFAULT 0")
+    if "solar_poll_seconds" not in existing_settings_cols:
+        with _conn:
+            _conn.execute("ALTER TABLE settings ADD COLUMN solar_poll_seconds INTEGER NOT NULL DEFAULT 30")
+    if "porsche_poll_seconds" not in existing_settings_cols:
+        with _conn:
+            _conn.execute("ALTER TABLE settings ADD COLUMN porsche_poll_seconds INTEGER NOT NULL DEFAULT 900")
 
     # Migration: solar_base_url (lokale API) -> solar_manager_id (Cloud-API).
     existing_cred_cols = {row[1] for row in _conn.execute("PRAGMA table_info(credentials)")}
@@ -141,6 +149,8 @@ def update_settings(fields: dict[str, Any]) -> None:
         "curfew_solar_coupled",
         "curfew_solar_offset_min",
         "no_reboot_in_curfew",
+        "solar_poll_seconds",
+        "porsche_poll_seconds",
     }
     fields = {k: v for k, v in fields.items() if k in allowed}
     if not fields:

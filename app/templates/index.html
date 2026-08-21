@@ -173,6 +173,10 @@
           <label class="field">Email <input type="text" id="porsche-email" autocomplete="off" /></label>
           <label class="field">Passwort <input type="password" id="porsche-password" autocomplete="new-password" /></label>
           <label class="field">VIN (optional, leer = erstes Fahrzeug) <input type="text" id="porsche-vin" /></label>
+          <label class="field">Abfrage-Intervall
+            <input type="number" id="porsche-poll-minutes" min="2" max="360" step="1" /> Minuten
+          </label>
+          <p class="hint">Mindestens 2 Minuten, um Porsches Backend nicht unnoetig zu belasten.</p>
 
           <div id="captcha-box" class="captcha-box" style="display:none">
             <p class="hint">Porsche verlangt ein Captcha zum Einloggen:</p>
@@ -211,6 +215,10 @@ porschecli -e DEINE@EMAIL -s porsche.session list</pre>
           <h2>☀️ Solar Manager <span class="led" id="led-solar" title="Noch nicht getestet"></span></h2>
           <label class="field">Solar Manager ID <input type="text" id="solar-manager-id" /></label>
           <label class="field">API-Key <input type="password" id="solar-api-key" autocomplete="new-password" /></label>
+          <label class="field">Abfrage-Intervall
+            <input type="number" id="solar-poll-seconds" min="10" max="600" step="5" /> Sekunden
+          </label>
+          <p class="hint">Steuert auch, wie oft die Easee-Wallbox mitgelesen wird (gleicher Zyklus).</p>
         </div>
 
         <div class="card">

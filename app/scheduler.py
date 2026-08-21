@@ -88,7 +88,12 @@ async def _solar_easee_loop() -> None:
             await _tick_solar_easee()
         except Exception:  # noqa: BLE001 - Loop darf nie aussterben
             _LOG.exception("Fehler im Solar/Easee-Loop")
-        await asyncio.sleep(config.SOLAR_EASEE_POLL_SECONDS)
+        # Intervall live aus den Settings lesen (im Zugangsdaten-Tab
+        # einstellbar), damit eine Aenderung ohne Neustart wirkt. Clamp als
+        # zweite Verteidigungslinie, falls mal ein alter/ungueltiger Wert in
+        # der DB steht (die API validiert bereits, siehe main.SettingsUpdate).
+        interval = db.get_settings().get("solar_poll_seconds") or config.SOLAR_EASEE_POLL_SECONDS
+        await asyncio.sleep(max(10, min(600, interval)))
 
 
 async def _tick_solar_easee() -> None:
@@ -176,7 +181,8 @@ async def _porsche_loop() -> None:
             await _tick_porsche()
         except Exception:  # noqa: BLE001
             _LOG.exception("Fehler im Porsche-Loop")
-        await asyncio.sleep(config.PORSCHE_POLL_SECONDS)
+        interval = db.get_settings().get("porsche_poll_seconds") or config.PORSCHE_POLL_SECONDS
+        await asyncio.sleep(max(120, min(21600, interval)))
 
 
 async def _tick_porsche() -> None:
