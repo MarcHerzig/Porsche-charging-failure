@@ -137,11 +137,15 @@ async def _tick_solar_easee() -> None:
             device_id = await solar_client.find_car_charger_device_id(
                 creds["solar_manager_id"], creds["solar_api_key"]
             )
-            target_mode = (
-                solar_client.CHARGING_MODE_FAST
-                if decision.charging_active
-                else solar_client.CHARGING_MODE_DO_NOT_CHARGE
-            )
+            if not decision.charging_active:
+                target_mode = solar_client.CHARGING_MODE_DO_NOT_CHARGE
+            elif settings["mode"] == "always":
+                target_mode = solar_client.CHARGING_MODE_FAST
+            else:
+                # Smart-Modus: nur die grobe Freigabe kommt von uns (genug
+                # Ueberschuss, keine Sperrzone) -- die Feinregelung der
+                # Ladeleistung uebernimmt Solar Managers eigener Solar-Modus.
+                target_mode = solar_client.CHARGING_MODE_ONLY_SOLAR
             await solar_client.set_car_charger_mode(
                 creds["solar_manager_id"], creds["solar_api_key"], device_id, target_mode
             )

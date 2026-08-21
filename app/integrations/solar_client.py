@@ -11,9 +11,18 @@ Easee: Solar Manager hat eine eigene, native Easee-Anbindung (Geraetetyp
 "carcharging") und ueberschreibt Easee-seitige pause/resume-Befehle
 innerhalb von Sekunden mit seiner eigenen Ladelogik -- live beobachtet
 sogar bei einem manuellen Pause in der offiziellen Easee-App. Wenn wir
-stattdessen den Lademodus IN Solar Manager selbst umschalten
-(chargingMode 0 = "Fast Charge" / 3 = "Do not charge"), gibt es keine
+stattdessen den Lademodus IN Solar Manager selbst umschalten, gibt es keine
 zwei Systeme mehr, die um denselben Charger konkurrieren.
+
+Welcher chargingMode wann gesetzt wird (siehe scheduler.py):
+- "Immer laden"-Modus: immer CHARGING_MODE_FAST -- unabhaengig von PV.
+- Smart-Modus, PV ueber Schwellwert (ausserhalb Sperrzone): CHARGING_MODE_
+  ONLY_SOLAR -- unsere App entscheidet nur noch die grobe Freigabe (genug
+  Ueberschuss vorhanden, keine Sperrzone), die eigentliche Feinregelung der
+  Ladeleistung uebernimmt danach Solar Managers eigener Solar-Modus.
+- Smart-Modus, PV unter Schwellwert oder Sperrzone aktiv: CHARGING_MODE_
+  DO_NOT_CHARGE -- harter Stopp, u.a. um den urspruenglichen Porsche-
+  Ladefehler bei Unterversorgung erst gar nicht zu provozieren.
 """
 
 from __future__ import annotations
@@ -31,8 +40,9 @@ _cached_device_id: str | None = None
 _cached_device_key: tuple[str, str] | None = None
 
 # chargingMode-Werte fuer PUT /v1/control/car-charger/{sensorId}
-CHARGING_MODE_FAST = 0  # "Fast Charge" -- entspricht unserem "soll laden"
-CHARGING_MODE_DO_NOT_CHARGE = 3  # "Do not charge" -- entspricht "soll nicht laden"
+CHARGING_MODE_FAST = 0  # "Fast Charge" -- fuer den "Immer laden"-Modus
+CHARGING_MODE_ONLY_SOLAR = 1  # "Only solar" -- fuer Smart-Modus, solange geladen werden soll
+CHARGING_MODE_DO_NOT_CHARGE = 3  # "Do not charge" -- solange nicht geladen werden soll
 
 
 class SolarManagerError(Exception):
