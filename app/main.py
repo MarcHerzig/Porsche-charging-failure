@@ -79,6 +79,7 @@ class SettingsUpdate(BaseModel):
     # waere trotzdem unnoetig aggressiv gegenueber Porsches Backend.
     solar_poll_seconds: int | None = Field(default=None, ge=10, le=600)
     porsche_poll_seconds: int | None = Field(default=None, ge=120, le=21600)
+    charge_limit_percent: float | None = Field(default=None, ge=20, le=100)
 
 
 @app.post("/api/settings")

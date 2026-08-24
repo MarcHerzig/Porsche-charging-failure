@@ -60,6 +60,8 @@ async function refreshLive() {
 
   $("pv-watts").textContent = data.pv_watts != null ? Math.round(data.pv_watts) : "–";
   $("consumption-watts").textContent = data.consumption_w != null ? Math.round(data.consumption_w) : "–";
+  $("surplus-watts").textContent = data.surplus_watts != null ? Math.round(data.surplus_watts) : "–";
+  $("charging-reason").textContent = data.decision_reason || "";
 
   const chargingBadge = $("charging-badge");
   if (data.charging_active === true) {
@@ -140,6 +142,85 @@ async function refreshLive() {
 
   renderForecast(data.forecast || []);
   $("forecast-error").textContent = data.forecast_error || "";
+  renderHistoryChart(data.history || []);
+}
+
+function renderHistoryChart(history) {
+  const canvas = $("history-chart");
+  const points = history.filter((h) => h.surplus_w != null || h.threshold_w != null);
+  const cssWidth = canvas.parentElement.clientWidth - 2;
+  const cssHeight = 160;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, cssWidth) * dpr;
+  canvas.height = cssHeight * dpr;
+  canvas.style.height = `${cssHeight}px`;
+
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+  if (!points.length) return;
+
+  const times = history.map((h) => new Date(h.ts).getTime());
+  const tMin = Math.min(...times);
+  const tMax = Math.max(...times);
+  const values = history.flatMap((h) => [h.surplus_w, h.threshold_w]).filter((v) => v != null);
+  let vMin = Math.min(0, ...values);
+  let vMax = Math.max(...values, 100);
+  const vPad = (vMax - vMin) * 0.08 || 10;
+  vMin -= vPad;
+  vMax += vPad;
+
+  const padT = 8, padB = 8;
+  const x = (t) => ((t - tMin) / Math.max(1, tMax - tMin)) * cssWidth;
+  const y = (v) => padT + (1 - (v - vMin) / Math.max(1, vMax - vMin)) * (cssHeight - padT - padB);
+
+  // Ladezeitraeume einfaerben
+  ctx.fillStyle = "rgba(61, 220, 132, 0.14)";
+  let bandStart = null;
+  history.forEach((h, i) => {
+    if (h.charging_active && bandStart == null) bandStart = times[i];
+    if ((!h.charging_active || i === history.length - 1) && bandStart != null) {
+      const bandEndX = x(times[i]);
+      ctx.fillRect(x(bandStart), padT, Math.max(1, bandEndX - x(bandStart)), cssHeight - padT - padB);
+      bandStart = null;
+    }
+  });
+
+  // Nulllinie
+  ctx.strokeStyle = "#29292e";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, y(0));
+  ctx.lineTo(cssWidth, y(0));
+  ctx.stroke();
+
+  // Schwellwert (gestrichelt, gold)
+  ctx.strokeStyle = "#e8b23d";
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  let started = false;
+  history.forEach((h, i) => {
+    if (h.threshold_w == null) { started = false; return; }
+    const px = x(times[i]);
+    const py = y(h.threshold_w);
+    if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Ueberschuss (durchgezogen, gruen)
+  ctx.strokeStyle = "#3ddc84";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  started = false;
+  history.forEach((h, i) => {
+    if (h.surplus_w == null) { started = false; return; }
+    const px = x(times[i]);
+    const py = y(h.surplus_w);
+    if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
+  });
+  ctx.stroke();
 }
 
 async function refreshLog() {
@@ -224,6 +305,8 @@ async function loadSettings() {
   $("curfew-solar-coupled").checked = !!s.curfew_solar_coupled;
   $("curfew-solar-offset").value = s.curfew_solar_offset_min;
   $("no-reboot-in-curfew").checked = !!s.no_reboot_in_curfew;
+  $("charge-limit").value = s.charge_limit_percent;
+  $("charge-limit-value").textContent = `${s.charge_limit_percent}%`;
   $("reboot-cooldown").value = s.reboot_cooldown_min;
   if (s.lat != null) $("lat").value = s.lat;
   if (s.lon != null) $("lon").value = s.lon;
@@ -250,6 +333,7 @@ async function saveSettings() {
     curfew_solar_coupled: $("curfew-solar-coupled").checked,
     curfew_solar_offset_min: Number($("curfew-solar-offset").value),
     no_reboot_in_curfew: $("no-reboot-in-curfew").checked,
+    charge_limit_percent: Number($("charge-limit").value),
     reboot_cooldown_min: Number($("reboot-cooldown").value),
   };
   await fetch("/api/settings", {
@@ -442,6 +526,9 @@ function init() {
   $("threshold").addEventListener("input", () => {
     $("threshold-value").textContent = `${$("threshold").value} W`;
   });
+  $("charge-limit").addEventListener("input", () => {
+    $("charge-limit-value").textContent = `${$("charge-limit").value}%`;
+  });
   document.querySelectorAll('input[name="mode"]').forEach((el) => el.addEventListener("change", updateSmartVisibility));
   $("curfew-solar-coupled").addEventListener("change", updateCurfewModeVisibility);
   $("curfew-solar-offset").addEventListener("input", updateCurfewSolarPreview);
@@ -458,6 +545,9 @@ function init() {
   setInterval(refreshLive, 10000);
   setInterval(refreshLog, 15000);
   setInterval(refreshRequests, 15000);
+  window.addEventListener("resize", () => {
+    if (LAST_LIVE) renderHistoryChart(LAST_LIVE.history || []);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", init);

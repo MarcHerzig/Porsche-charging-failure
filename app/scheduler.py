@@ -1,10 +1,12 @@
 """Hintergrund-Loops: PV/Easee-Regelschleife (schnell), Porsche-Fehler-Check
 (langsam, 15 Min) und PV-Forecast (alle paar Stunden).
 
-Live-Werte werden im Prozessspeicher gehalten (kein Verlauf/Chart gefordert);
-persistiert wird nur, was einen Container-Neustart ueberleben muss: die
-Debounce-Timer, der zuletzt angewandte Lade-Zustand, Reboot-Zeitpunkt und
-Porsche-Fehlerbeginn.
+Live-Werte werden im Prozessspeicher gehalten, inklusive eines auf
+HISTORY_MAX_POINTS begrenzten Ringpuffers (LIVE["history"]) fuer den
+Ueberschuss-Chart im Dashboard -- der ueberlebt bewusst keinen Neustart,
+nur fuer den fortlaufenden Betrieb persistiert wird, was einen Container-
+Neustart ueberleben muss: die Debounce-Timer, der zuletzt angewandte
+Lade-Zustand, Reboot-Zeitpunkt und Porsche-Fehlerbeginn.
 """
 
 from __future__ import annotations
@@ -21,6 +23,8 @@ _LOG = logging.getLogger("scheduler")
 LIVE: dict = {
     "pv_watts": None,
     "consumption_w": None,
+    "surplus_watts": None,
+    "decision_reason": None,
     "solar_error": None,
     "solar_updated_at": None,
     "easee_op_mode": None,
@@ -39,10 +43,17 @@ LIVE: dict = {
     "forecast_error": None,
     "utc_offset_seconds": 0,
     "charging_active": None,
+    "history": [],
 }
 
 
 HOME_RADIUS_KM = 0.3
+
+# Ringpuffer-Groesse fuer den Ueberschuss-Chart -- grob 24h bei den
+# 30s-Standard-Poll-Intervall; bei laengeren Intervallen deckt das mehr als
+# 24h ab, bei kuerzeren entsprechend weniger. Kein hartes Zeitfenster, um den
+# Speicher nicht pro Tick parsen/filtern zu muessen.
+HISTORY_MAX_POINTS = 2880
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -102,13 +113,14 @@ async def _tick_solar_easee() -> None:
     runtime = db.get_runtime_state()
     now = datetime.now(timezone.utc)
 
-    pv_watts = None
+    surplus_watts = None
     try:
         point = await solar_client.get_current_point(creds["solar_manager_id"], creds["solar_api_key"])
-        pv_watts = point.production_w
+        surplus_watts = point.production_w - point.consumption_w
         LIVE.update(
             pv_watts=point.production_w,
             consumption_w=point.consumption_w,
+            surplus_watts=surplus_watts,
             solar_error=None,
             solar_updated_at=now.isoformat(),
         )
@@ -117,7 +129,7 @@ async def _tick_solar_easee() -> None:
 
     sunrise, sunset = _todays_sun_times()
     decision = control.evaluate(
-        pv_watts=pv_watts,
+        surplus_watts=surplus_watts,
         now=now,
         settings=settings,
         prev_pending_target=bool(runtime["pending_target"]) if runtime["pending_target"] is not None else None,
@@ -126,14 +138,29 @@ async def _tick_solar_easee() -> None:
         utc_offset_seconds=LIVE.get("utc_offset_seconds", 0),
         sunrise=sunrise,
         sunset=sunset,
+        battery_percent=LIVE.get("porsche_battery"),
     )
     LIVE["charging_active"] = decision.charging_active
+    LIVE["decision_reason"] = decision.reason
+
+    LIVE["history"].append(
+        {
+            "ts": now.isoformat(),
+            "production_w": LIVE["pv_watts"],
+            "consumption_w": LIVE["consumption_w"],
+            "surplus_w": surplus_watts,
+            "threshold_w": settings["threshold_w"],
+            "charging_active": decision.charging_active,
+        }
+    )
+    if len(LIVE["history"]) > HISTORY_MAX_POINTS:
+        del LIVE["history"][: len(LIVE["history"]) - HISTORY_MAX_POINTS]
 
     db.update_runtime_state(
         {
             "pending_target": int(decision.raw_should_charge),
             "condition_since": decision.condition_since.isoformat(),
-            "last_pv_watts": pv_watts,
+            "last_pv_watts": surplus_watts,
         }
     )
 
@@ -235,7 +262,17 @@ async def _tick_porsche() -> None:
     error_since = _parse_ts(runtime["porsche_error_since"])
     last_reboot = _parse_ts(runtime["last_reboot_at"])
 
-    if status.is_error:
+    charge_limit = settings.get("charge_limit_percent")
+    limit_reached = (
+        charge_limit is not None and status.battery_percent is not None and status.battery_percent >= charge_limit
+    )
+
+    if limit_reached:
+        # Ladelimit erreicht -- Ladefehler/Reboot-Automatik bewusst ignorieren,
+        # das Auto ist ohnehin "fertig" geladen und braucht keinen Eingriff.
+        if error_since is not None:
+            db.update_runtime_state({"porsche_error_since": None})
+    elif status.is_error:
         if error_since is None:
             db.update_runtime_state({"porsche_error_since": now.isoformat()})
             db.add_event("charge_error_detected", f"Ladefehler erkannt (Status: {status.status})")

@@ -45,6 +45,13 @@
                 <small>Verbrauch (W)</small>
               </div>
             </div>
+            <div class="stat">
+              <span class="stat-icon">🔺</span>
+              <div>
+                <span id="surplus-watts">–</span>
+                <small>Ueberschuss (W)</small>
+              </div>
+            </div>
           </div>
           <div class="status-badges">
             <div class="status-badge" id="charging-badge">
@@ -62,6 +69,7 @@
               </div>
             </div>
           </div>
+          <p id="charging-reason" class="hint"></p>
         </div>
 
         <div class="card">
@@ -138,12 +146,28 @@
             </label>
           </div>
 
+          <label class="field">
+            <span class="field-label">Laden bis <strong id="charge-limit-value">–</strong></span>
+            <input type="range" id="charge-limit" min="20" max="100" step="5" />
+          </label>
+          <p class="hint">Ab diesem Ladestand wird nicht mehr geladen -- und Ladefehler werden ignoriert (kein automatischer Reboot), egal in welchem Modus.</p>
+
           <label class="field">Reboot-Cooldown (Min)
             <input type="number" id="reboot-cooldown" min="1" max="240" />
           </label>
 
           <button id="save-settings">Speichern</button>
           <span id="settings-saved" class="saved-hint"></span>
+        </div>
+
+        <div class="card card-forecast" id="history-card">
+          <h2>Verlauf -- Ueberschuss vs. Schwellwert</h2>
+          <canvas id="history-chart"></canvas>
+          <div class="chart-legend">
+            <span><i class="legend-dot legend-surplus"></i>Ueberschuss</span>
+            <span><i class="legend-dot legend-threshold"></i>Schwellwert</span>
+            <span><i class="legend-dot legend-charging"></i>Laedt</span>
+          </div>
         </div>
 
         <div class="card card-forecast">

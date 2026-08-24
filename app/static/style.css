@@ -168,7 +168,7 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
 }
 
 /* ---------- Stats ---------- */
-.stat-row { display: flex; gap: 1.5rem; margin-bottom: 1rem; }
+.stat-row { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1rem; }
 .stat { display: flex; align-items: center; gap: 0.6rem; }
 .stat-icon { font-size: 1.6rem; }
 .stat span { display: block; font-size: 1.7rem; font-weight: 700; font-family: "Barlow Condensed", sans-serif; }
@@ -240,6 +240,29 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
 .stack { display: flex; flex-direction: column; gap: 1.25rem; }
 .table-scroll { overflow-x: auto; }
 .table-scroll table { min-width: max-content; }
+
+/* ---------- History chart ---------- */
+#history-chart { width: 100%; display: block; }
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+.legend-surplus { background: var(--ok); }
+.legend-threshold { background: var(--gold); }
+.legend-charging { background: rgba(61, 220, 132, 0.35); }
 
 /* ---------- Forecast strip ---------- */
 .card-forecast { grid-column: 1 / -1; }
