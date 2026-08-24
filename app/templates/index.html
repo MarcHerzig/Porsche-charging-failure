@@ -45,11 +45,11 @@
                 <small>Verbrauch (W)</small>
               </div>
             </div>
-            <div class="stat">
+            <div class="stat" title="Ueberschuss = Produktion minus Verbrauch -- dieser Wert entscheidet, ob geladen wird">
               <span class="stat-icon">🔺</span>
               <div>
                 <span id="surplus-watts">–</span>
-                <small>Ueberschuss (W)</small>
+                <small>Ueberschuss in W (Produktion − Verbrauch)</small>
               </div>
             </div>
           </div>
@@ -147,10 +147,10 @@
           </div>
 
           <label class="field">
-            <span class="field-label">Laden bis <strong id="charge-limit-value">–</strong></span>
+            <span class="field-label">Kein Reboot mehr ab <strong id="charge-limit-value">–</strong></span>
             <input type="range" id="charge-limit" min="20" max="100" step="5" />
           </label>
-          <p class="hint">Ab diesem Ladestand wird nicht mehr geladen -- und Ladefehler werden ignoriert (kein automatischer Reboot), egal in welchem Modus.</p>
+          <p class="hint">Ab diesem Ladestand werden Ladefehler ignoriert und die Wallbox nicht mehr automatisch neu gebootet -- an der Ladesteuerung selbst aendert das nichts.</p>
 
           <label class="field">Reboot-Cooldown (Min)
             <input type="number" id="reboot-cooldown" min="1" max="240" />

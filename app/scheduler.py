@@ -116,7 +116,9 @@ async def _tick_solar_easee() -> None:
     surplus_watts = None
     try:
         point = await solar_client.get_current_point(creds["solar_manager_id"], creds["solar_api_key"])
-        surplus_watts = point.production_w - point.consumption_w
+        # Negativer Ueberschuss (mehr Verbrauch als Produktion) ist fuer die
+        # Ladeentscheidung/Anzeige gleichbedeutend mit "kein Ueberschuss".
+        surplus_watts = max(0.0, point.production_w - point.consumption_w)
         LIVE.update(
             pv_watts=point.production_w,
             consumption_w=point.consumption_w,
@@ -138,7 +140,6 @@ async def _tick_solar_easee() -> None:
         utc_offset_seconds=LIVE.get("utc_offset_seconds", 0),
         sunrise=sunrise,
         sunset=sunset,
-        battery_percent=LIVE.get("porsche_battery"),
     )
     LIVE["charging_active"] = decision.charging_active
     LIVE["decision_reason"] = decision.reason

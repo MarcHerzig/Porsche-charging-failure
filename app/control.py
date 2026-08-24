@@ -81,7 +81,6 @@ def evaluate(
     utc_offset_seconds: int = 0,
     sunrise: dtime | None = None,
     sunset: dtime | None = None,
-    battery_percent: float | None = None,
 ) -> ControlDecision:
     """`now` ist der tatsaechliche Zeitpunkt (fuer Hysterese-/Zeitstempel-
     Buchhaltung, beliebige aware-Zeitzone). Fuer den Sperrzonen-Vergleich
@@ -112,16 +111,6 @@ def evaluate(
             raw_should_charge = surplus_watts >= settings["threshold_w"]
             reason = f"Ueberschuss {surplus_watts:.0f}W vs. Schwellwert {settings['threshold_w']:.0f}W"
 
-    charge_limit = settings.get("charge_limit_percent")
-    limit_reached = (
-        charge_limit is not None and battery_percent is not None and battery_percent >= charge_limit
-    )
-    if limit_reached:
-        # Ladelimit ist ein bewusster Deckel und uebersteuert Modus/PV/Sperrzone:
-        # sobald erreicht, soll sofort gestoppt werden.
-        raw_should_charge = False
-        reason = f"Ladelimit erreicht ({battery_percent:.0f}% >= {charge_limit:.0f}%)"
-
     if prev_pending_target is None or prev_pending_target != raw_should_charge:
         condition_since = now
     else:
@@ -135,7 +124,7 @@ def evaluate(
         # und sollen sofort greifen -- die Hysterese ist nur gegen PV-Flattern
         # im Smart-Modus gedacht, nicht fuer einen manuellen Moduswechsel.
         is_curfew_stop = mode == "smart" and settings["curfew_enabled"] and not raw_should_charge and "Sperrzone" in reason
-        is_instant = is_curfew_stop or mode == "always" or limit_reached
+        is_instant = is_curfew_stop or mode == "always"
         if is_instant or elapsed_min >= required_min:
             changed = True
 
