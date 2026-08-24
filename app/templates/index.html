@@ -3,21 +3,22 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Porsche Solar Charge Guard</title>
+  <title>Taycan Energy Control</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}" />
 </head>
 <body>
   <header class="hero">
     <div class="hero-inner">
-      <div class="wordmark">PORSCHE</div>
-      <div class="tagline">SOLAR CHARGE GUARD</div>
+      <img class="hero-logo" src="/static/taycan-logo.jpg?v={{ asset_version }}" alt="Porsche Taycan" />
+      <div class="hero-title">Taycan</div>
+      <div class="hero-subtitle">Energy Control</div>
     </div>
     <nav>
       <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-      <button class="tab-btn" data-tab="credentials">Zugangsdaten</button>
+      <button class="tab-btn" data-tab="credentials">Settings</button>
       <button class="tab-btn" data-tab="log">Log</button>
     </nav>
   </header>
@@ -25,166 +26,153 @@
   <main>
     <section id="tab-dashboard" class="tab active">
       <div class="grid">
-        <div class="card card-live">
+        <div class="card card-live" data-card="live">
           <h2>
             <span class="dot" id="status-dot"></span>Live
-            <button class="btn-refresh" id="refresh-btn" type="button" title="Jetzt aktualisieren">🔄</button>
+            <button class="btn-refresh" id="refresh-btn" type="button" title="Jetzt aktualisieren">Aktualisieren</button>
           </h2>
-          <div class="stat-row">
-            <div class="stat">
-              <span class="stat-icon">☀️</span>
-              <div>
+          <div class="card-body">
+            <div class="stat-row">
+              <div class="stat">
                 <span id="pv-watts">–</span>
                 <small>PV-Produktion (W)</small>
               </div>
-            </div>
-            <div class="stat">
-              <span class="stat-icon">🏠</span>
-              <div>
+              <div class="stat">
                 <span id="consumption-watts">–</span>
                 <small>Verbrauch (W)</small>
               </div>
-            </div>
-            <div class="stat" title="Ueberschuss = Produktion minus Verbrauch -- dieser Wert entscheidet, ob geladen wird">
-              <span class="stat-icon">🔺</span>
-              <div>
+              <div class="stat" title="Ueberschuss = Produktion minus Verbrauch -- dieser Wert entscheidet, ob geladen wird">
                 <span id="surplus-watts">–</span>
                 <small>Ueberschuss in W (Produktion − Verbrauch)</small>
               </div>
             </div>
-          </div>
-          <div class="status-badges">
-            <div class="status-badge" id="charging-badge">
-              <span class="status-badge-icon" id="charging-badge-icon">⏸</span>
-              <div class="status-badge-text">
-                <small>Ziel</small>
-                <span id="charging-state">–</span>
+            <div class="status-badges">
+              <div class="status-badge" id="charging-badge">
+                <div class="status-badge-text">
+                  <small>Ziel</small>
+                  <span id="charging-state">–</span>
+                </div>
               </div>
             </div>
-            <div class="status-badge" id="easee-badge">
-              <span class="status-badge-icon" id="easee-badge-icon">🔌</span>
-              <div class="status-badge-text">
-                <small>Wallbox</small>
-                <span id="easee-op-mode">–</span>
-              </div>
-            </div>
+            <p id="charging-reason" class="hint"></p>
           </div>
-          <p id="charging-reason" class="hint"></p>
         </div>
 
-        <div class="card">
+        <div class="card" data-card="porsche">
           <h2><span class="led" id="porsche-led" title="Noch keine Daten"></span>Porsche</h2>
-          <div class="stat-row">
-            <div class="stat">
-              <span class="stat-icon">🔋</span>
-              <div>
+          <div class="card-body">
+            <div class="stat-row">
+              <div class="stat">
                 <span id="porsche-battery-stat">–</span>
                 <small>Ladestand</small>
               </div>
-            </div>
-            <div class="stat">
-              <span class="stat-icon" id="porsche-home-icon">📍</span>
-              <div>
+              <div class="stat">
                 <span id="porsche-location">–</span>
                 <small>Standort</small>
               </div>
             </div>
-          </div>
-          <div class="pill-row">
-            <span class="pill" id="porsche-state">–</span>
+            <div class="status-badges">
+              <div class="status-badge" id="porsche-charging-badge">
+                <div class="status-badge-text">
+                  <small>Status</small>
+                  <span id="porsche-charging-state">–</span>
+                </div>
+              </div>
+            </div>
+            <div class="pill-row">
+              <span class="pill" id="porsche-state">–</span>
+            </div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" data-card="lademodus">
           <h2>Lademodus</h2>
-          <div class="segmented">
-            <label class="segment">
-              <input type="radio" name="mode" value="smart" />
-              <span>Smart laden</span>
-            </label>
-            <label class="segment">
-              <input type="radio" name="mode" value="always" />
-              <span>Immer laden</span>
-            </label>
-          </div>
-
-          <div id="smart-settings">
-            <label class="field">
-              <span class="field-label">Schwellwert -- Ueberschuss W fuer Ladestart <strong id="threshold-value">–</strong></span>
-              <input type="range" id="threshold" min="0" max="11000" step="100" />
-            </label>
-
-            <div class="row">
-              <label class="field">Start-Verzoegerung (Min)
-                <input type="number" id="start-debounce" min="0" max="60" />
+          <div class="card-body">
+            <div class="segmented">
+              <label class="segment">
+                <input type="radio" name="mode" value="smart" />
+                <span>Smart laden</span>
               </label>
-              <label class="field">Stopp-Verzoegerung (Min)
-                <input type="number" id="stop-debounce" min="0" max="60" />
+              <label class="segment">
+                <input type="radio" name="mode" value="always" />
+                <span>Immer laden</span>
               </label>
             </div>
 
-            <label class="checkbox">
-              <input type="checkbox" id="curfew-enabled" /> Sperrzone aktiv
-            </label>
-            <div class="row">
-              <label class="field">Von <input type="time" id="curfew-start" /></label>
-              <label class="field">Bis <input type="time" id="curfew-end" /></label>
-            </div>
+            <div id="smart-settings">
+              <label class="field">
+                <span class="field-label">Schwellwert -- Ueberschuss W fuer Ladestart <strong id="threshold-value">–</strong></span>
+                <input type="range" id="threshold" min="0" max="11000" step="100" />
+              </label>
 
-            <div class="sun-coupled-box">
+              <div class="row">
+                <label class="field">Start-Verzoegerung (Min)
+                  <input type="number" id="start-debounce" min="0" max="60" />
+                </label>
+                <label class="field">Stopp-Verzoegerung (Min)
+                  <input type="number" id="stop-debounce" min="0" max="60" />
+                </label>
+              </div>
+
               <label class="checkbox">
-                <input type="checkbox" id="curfew-solar-coupled" /> An Sonnenauf-/-untergang koppeln
+                <input type="checkbox" id="curfew-enabled" /> Sperrzone aktiv
               </label>
-              <label class="field">Versatz (Min vor Sonnenuntergang / nach Sonnenaufgang)
-                <input type="number" id="curfew-solar-offset" min="0" max="180" />
+              <div class="row">
+                <label class="field">Von <input type="time" id="curfew-start" /></label>
+                <label class="field">Bis <input type="time" id="curfew-end" /></label>
+              </div>
+
+              <div class="sun-coupled-box">
+                <label class="checkbox">
+                  <input type="checkbox" id="curfew-solar-coupled" /> An Sonnenauf-/-untergang koppeln
+                </label>
+                <label class="field">Versatz (Min vor Sonnenuntergang / nach Sonnenaufgang)
+                  <input type="number" id="curfew-solar-offset" min="0" max="180" />
+                </label>
+                <p id="curfew-solar-preview" class="hint"></p>
+              </div>
+
+              <label class="checkbox">
+                <input type="checkbox" id="no-reboot-in-curfew" /> Kein Reboot der Wallbox in Sperrzone
               </label>
-              <p id="curfew-solar-preview" class="hint"></p>
             </div>
 
-            <label class="checkbox">
-              <input type="checkbox" id="no-reboot-in-curfew" /> Kein Reboot der Wallbox in Sperrzone
+            <label class="field">
+              <span class="field-label">Kein Reboot mehr ab <strong id="charge-limit-value">–</strong></span>
+              <input type="range" id="charge-limit" min="20" max="100" step="5" />
             </label>
+            <p class="hint">Ab diesem Ladestand werden Ladefehler ignoriert und die Wallbox nicht mehr automatisch neu gebootet.</p>
+
+            <label class="field">Reboot-Cooldown (Min)
+              <input type="number" id="reboot-cooldown" min="1" max="240" />
+            </label>
+
+            <span id="settings-saved" class="saved-hint"></span>
           </div>
-
-          <label class="field">
-            <span class="field-label">Kein Reboot mehr ab <strong id="charge-limit-value">–</strong></span>
-            <input type="range" id="charge-limit" min="20" max="100" step="5" />
-          </label>
-          <p class="hint">Ab diesem Ladestand werden Ladefehler ignoriert und die Wallbox nicht mehr automatisch neu gebootet.</p>
-
-          <label class="field">Reboot-Cooldown (Min)
-            <input type="number" id="reboot-cooldown" min="1" max="240" />
-          </label>
-
-          <button id="save-settings">Speichern</button>
-          <span id="settings-saved" class="saved-hint"></span>
         </div>
 
-        <div class="card card-forecast" id="history-card">
+        <div class="card card-forecast" data-card="history">
           <h2>Verlauf -- Ueberschuss vs. Schwellwert</h2>
-          <canvas id="history-chart"></canvas>
-          <div class="chart-legend">
-            <span><i class="legend-dot legend-surplus"></i>Ueberschuss</span>
-            <span><i class="legend-dot legend-threshold"></i>Schwellwert</span>
-            <span><i class="legend-dot legend-charging"></i>Laedt</span>
+          <div class="card-body">
+            <canvas id="history-chart"></canvas>
+            <div class="chart-legend">
+              <span><i class="legend-dot legend-surplus"></i>Ueberschuss</span>
+              <span><i class="legend-dot legend-threshold"></i>Schwellwert</span>
+              <span><i class="legend-dot legend-charging"></i>Laedt</span>
+            </div>
           </div>
         </div>
 
-        <div class="card card-forecast">
+        <div class="card card-forecast" data-card="forecast">
           <h2>PV-Forecast <small id="forecast-location"></small></h2>
-          <div id="forecast-strip" class="forecast-strip"></div>
-          <p id="forecast-error" class="errors"></p>
+          <div class="card-body">
+            <div id="forecast-strip" class="forecast-strip"></div>
+            <p id="forecast-error" class="errors"></p>
+          </div>
         </div>
 
-        <div class="card">
-          <h2>Wallbox</h2>
-          <p class="hint">Erzwungener Neustart der Easee-Wallbox, unabhaengig vom Lademodus.</p>
-          <button class="btn-outline" id="reboot-btn">Ladestation jetzt neu booten</button>
-          <span id="reboot-hint" class="saved-hint"></span>
-        </div>
-
-        <div class="card card-forecast card-error-panel" id="error-panel" style="display:none">
-          <h2>⚠️ Fehler</h2>
+        <div class="card card-forecast card-error-panel no-collapse" id="error-panel" style="display:none">
+          <h2>Fehler</h2>
           <div id="error-list" class="error-list"></div>
         </div>
       </div>
@@ -192,91 +180,111 @@
 
     <section id="tab-credentials" class="tab">
       <div class="grid">
-        <div class="card">
-          <h2>Porsche Connect <span class="led" id="led-porsche" title="Noch nicht getestet"></span></h2>
-          <label class="field">Email <input type="text" id="porsche-email" autocomplete="off" /></label>
-          <label class="field">Passwort <input type="password" id="porsche-password" autocomplete="new-password" /></label>
-          <label class="field">VIN (optional, leer = erstes Fahrzeug) <input type="text" id="porsche-vin" /></label>
-          <label class="field">Abfrage-Intervall
-            <input type="number" id="porsche-poll-minutes" min="2" max="360" step="1" /> Minuten
-          </label>
-          <p class="hint">Mindestens 2 Minuten, um Porsches Backend nicht unnoetig zu belasten.</p>
-
-          <div id="captcha-box" class="captcha-box" style="display:none">
-            <p class="hint">Porsche verlangt ein Captcha zum Einloggen:</p>
-            <img id="captcha-image" alt="Captcha" />
-            <label class="field">Captcha-Code
-              <input type="text" id="captcha-code" autocomplete="off" />
-            </label>
-            <button class="btn-outline" id="captcha-submit-btn" type="button">Captcha loesen</button>
-            <p id="captcha-hint" class="hint"></p>
+        <div class="card" data-card="wallbox-reboot">
+          <h2>Wallbox</h2>
+          <div class="card-body">
+            <p class="hint">Erzwungener Neustart der Easee-Wallbox, unabhaengig vom Lademodus.</p>
+            <button class="btn-outline" id="reboot-btn">Ladestation jetzt neu booten</button>
+            <span id="reboot-hint" class="saved-hint"></span>
           </div>
+        </div>
 
-          <details class="fallback">
-            <summary>Alternative: Session-Token manuell einfuegen</summary>
-            <p class="hint">
-              Falls das Captcha-Bild oben nicht laedt, einmalig lokal (von
-              deinem normalen Internetanschluss, nicht aus der Cloud)
-              einloggen:
-            </p>
-            <pre class="code-block">pip install "pyporscheconnectapi&gt;=0.2.7"
-porschecli -e DEINE@EMAIL -s porsche.session list</pre>
-            <p class="hint">Danach den Inhalt der Datei <code>porsche.session</code> hier einfuegen:</p>
-            <label class="field">Session-Token (JSON)
-              <textarea id="porsche-session" rows="3" placeholder='{"access_token": "...", "refresh_token": "...", ...}'></textarea>
+        <div class="card" data-card="cred-porsche">
+          <h2>Porsche Connect <span class="led" id="led-porsche" title="Noch nicht getestet"></span></h2>
+          <div class="card-body">
+            <label class="field">Email <input type="text" id="porsche-email" autocomplete="off" /></label>
+            <label class="field">Passwort <input type="password" id="porsche-password" autocomplete="new-password" /></label>
+            <label class="field">VIN (optional, leer = erstes Fahrzeug) <input type="text" id="porsche-vin" /></label>
+            <label class="field">Abfrage-Intervall
+              <input type="number" id="porsche-poll-minutes" min="2" max="360" step="1" /> Minuten
             </label>
-          </details>
+            <p class="hint">Mindestens 2 Minuten, um Porsches Backend nicht unnoetig zu belasten.</p>
+
+            <div id="captcha-box" class="captcha-box" style="display:none">
+              <p class="hint">Porsche verlangt ein Captcha zum Einloggen:</p>
+              <img id="captcha-image" alt="Captcha" />
+              <label class="field">Captcha-Code
+                <input type="text" id="captcha-code" autocomplete="off" />
+              </label>
+              <button class="btn-outline" id="captcha-submit-btn" type="button">Captcha loesen</button>
+              <p id="captcha-hint" class="hint"></p>
+            </div>
+
+            <details class="fallback">
+              <summary>Alternative: Session-Token manuell einfuegen</summary>
+              <p class="hint">
+                Falls das Captcha-Bild oben nicht laedt, einmalig lokal (von
+                deinem normalen Internetanschluss, nicht aus der Cloud)
+                einloggen:
+              </p>
+              <pre class="code-block">pip install "pyporscheconnectapi&gt;=0.2.7"
+porschecli -e DEINE@EMAIL -s porsche.session list</pre>
+              <p class="hint">Danach den Inhalt der Datei <code>porsche.session</code> hier einfuegen:</p>
+              <label class="field">Session-Token (JSON)
+                <textarea id="porsche-session" rows="3" placeholder='{"access_token": "...", "refresh_token": "...", ...}'></textarea>
+              </label>
+            </details>
+          </div>
         </div>
 
-        <div class="card">
-          <h2>🔌 Easee Wallbox <span class="led" id="led-easee" title="Noch nicht getestet"></span></h2>
-          <label class="field">Email <input type="text" id="easee-email" autocomplete="off" /></label>
-          <label class="field">Passwort <input type="password" id="easee-password" autocomplete="new-password" /></label>
-          <label class="field">Charger-ID <input type="text" id="easee-charger-id" /></label>
+        <div class="card" data-card="cred-easee">
+          <h2>Easee Wallbox <span class="led" id="led-easee" title="Noch nicht getestet"></span></h2>
+          <div class="card-body">
+            <label class="field">Email <input type="text" id="easee-email" autocomplete="off" /></label>
+            <label class="field">Passwort <input type="password" id="easee-password" autocomplete="new-password" /></label>
+            <label class="field">Charger-ID <input type="text" id="easee-charger-id" /></label>
+          </div>
         </div>
 
-        <div class="card">
-          <h2>☀️ Solar Manager <span class="led" id="led-solar" title="Noch nicht getestet"></span></h2>
-          <label class="field">Solar Manager ID <input type="text" id="solar-manager-id" /></label>
-          <label class="field">API-Key <input type="password" id="solar-api-key" autocomplete="new-password" /></label>
-          <label class="field">Abfrage-Intervall
-            <input type="number" id="solar-poll-seconds" min="10" max="600" step="5" /> Sekunden
-          </label>
-          <p class="hint">Steuert auch, wie oft die Easee-Wallbox mitgelesen wird (gleicher Zyklus).</p>
+        <div class="card" data-card="cred-solar">
+          <h2>Solar Manager <span class="led" id="led-solar" title="Noch nicht getestet"></span></h2>
+          <div class="card-body">
+            <label class="field">Solar Manager ID <input type="text" id="solar-manager-id" /></label>
+            <label class="field">API-Key <input type="password" id="solar-api-key" autocomplete="new-password" /></label>
+            <label class="field">Abfrage-Intervall
+              <input type="number" id="solar-poll-seconds" min="10" max="600" step="5" /> Sekunden
+            </label>
+            <p class="hint">Steuert auch, wie oft die Easee-Wallbox mitgelesen wird (gleicher Zyklus).</p>
+          </div>
         </div>
 
-        <div class="card">
-          <h2>📍 Standort (fuer PV-Forecast)</h2>
-          <label class="field">Ort <input type="text" id="location-query" placeholder="z.B. Zuerich, Schweiz" /></label>
-          <button class="btn-outline" id="geocode-btn" type="button">Ort suchen</button>
-          <p id="location-resolved" class="hint"></p>
-          <input type="hidden" id="lat" />
-          <input type="hidden" id="lon" />
+        <div class="card" data-card="cred-location">
+          <h2>Standort <small>fuer PV-Forecast</small></h2>
+          <div class="card-body">
+            <label class="field">Ort <input type="text" id="location-query" placeholder="z.B. Zuerich, Schweiz" /></label>
+            <button class="btn-outline" id="geocode-btn" type="button">Ort suchen</button>
+            <p id="location-resolved" class="hint"></p>
+            <input type="hidden" id="lat" />
+            <input type="hidden" id="lon" />
+          </div>
         </div>
       </div>
-      <button id="save-credentials">Speichern</button>
       <span id="credentials-saved" class="saved-hint"></span>
     </section>
 
     <section id="tab-log" class="tab">
       <div class="stack">
-        <div class="card">
+        <div class="card" data-card="log-actions">
           <h2>Letzte Aktionen</h2>
-          <div class="table-scroll">
-            <table id="log-table">
-              <thead><tr><th>Zeit</th><th>Typ</th><th>Nachricht</th></tr></thead>
-              <tbody></tbody>
-            </table>
+          <div class="card-body">
+            <div class="table-scroll">
+              <table id="log-table">
+                <thead><tr><th>Zeit</th><th>Typ</th><th>Nachricht</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" data-card="log-requests">
           <h2>API-Befehle <small>ausgehende Aktionen (kein Status-Polling)</small></h2>
-          <div class="table-scroll">
-            <table id="requests-table">
-              <thead><tr><th>Zeit</th><th>Quelle</th><th>Methode</th><th>Status</th><th>URL</th></tr></thead>
-              <tbody></tbody>
-            </table>
+          <div class="card-body">
+            <div class="table-scroll">
+              <table id="requests-table">
+                <thead><tr><th>Zeit</th><th>Quelle</th><th>Methode</th><th>Status</th><th>URL</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -284,7 +292,7 @@ porschecli -e DEINE@EMAIL -s porsche.session list</pre>
   </main>
 
   <footer>
-    <span>Porsche Solar Charge Guard — solargesteuertes Laden mit automatischer Fehlerbehebung</span>
+    <span>Taycan Energy Control — solargesteuertes Laden mit automatischer Fehlerbehebung</span>
   </footer>
 
   <script src="/static/app.js?v={{ asset_version }}"></script>

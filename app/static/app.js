@@ -13,24 +13,37 @@ function setupTabs() {
   });
 }
 
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+const COLLAPSE_STORAGE_PREFIX = "porsche-card-collapsed:";
+
+function setupCollapsibleCards() {
+  document.querySelectorAll(".card[data-card]").forEach((card) => {
+    if (card.classList.contains("no-collapse")) return;
+    const key = COLLAPSE_STORAGE_PREFIX + card.dataset.card;
+    if (localStorage.getItem(key) === "1") card.classList.add("collapsed");
+
+    const heading = card.querySelector(":scope > h2");
+    heading.addEventListener("click", (e) => {
+      if (e.target.closest(".btn-refresh")) return;
+      const collapsed = card.classList.toggle("collapsed");
+      localStorage.setItem(key, collapsed ? "1" : "0");
+      if (!collapsed && card.dataset.card === "history" && LAST_LIVE) {
+        renderHistoryChart(LAST_LIVE.history || []);
+      }
+    });
+  });
+}
+
 function fmtTime(iso) {
   if (!iso) return "-";
   return new Date(iso).toLocaleString("de-CH");
-}
-
-function porscheIcon(status, isError) {
-  if (isError) return "🚨";
-  if (!status) return "🚗";
-  if (status.includes("CHARGING") || status === "INITIALISING") return "🔌⚡";
-  if (status === "COMPLETED") return "🔋";
-  return "🚗";
-}
-
-function weatherIcon(day) {
-  if (day.precipitation_mm >= 1) return "🌧️";
-  if (day.sunshine_hours >= 7) return "☀️";
-  if (day.sunshine_hours >= 3) return "⛅";
-  return "☁️";
 }
 
 function renderForecast(days) {
@@ -43,10 +56,9 @@ function renderForecast(days) {
     el.className = "forecast-day";
     el.innerHTML = `
       <span class="fc-label">${label}</span>
-      <span class="fc-icon">${weatherIcon(day)}</span>
       <span class="fc-value">${day.radiation_kwh_m2} kWh/m²</span>
       <span class="fc-sub">${day.sunshine_hours} h Sonne</span>
-      <span class="fc-sun">🌅 ${day.sunrise || "–"} · 🌇 ${day.sunset || "–"}</span>
+      <span class="fc-sun">${day.sunrise || "–"} · ${day.sunset || "–"}</span>
     `;
     strip.appendChild(el);
   });
@@ -65,34 +77,31 @@ async function refreshLive() {
 
   const chargingBadge = $("charging-badge");
   if (data.charging_active === true) {
-    $("charging-badge-icon").textContent = "⚡";
     $("charging-state").textContent = "Laedt";
     chargingBadge.className = "status-badge ok";
   } else if (data.charging_active === false) {
-    $("charging-badge-icon").textContent = "⏸";
     $("charging-state").textContent = "Pausiert";
     chargingBadge.className = "status-badge neutral";
   } else {
-    $("charging-badge-icon").textContent = "❔";
     $("charging-state").textContent = "–";
     chargingBadge.className = "status-badge neutral";
   }
 
-  const easeeBadge = $("easee-badge");
-  $("easee-op-mode").textContent = data.easee_op_mode || "–";
-  if (data.easee_op_mode == null) {
-    easeeBadge.className = "status-badge neutral";
-  } else if (data.easee_has_current === false) {
-    easeeBadge.className = "status-badge neutral";
+  const porscheChargingBadge = $("porsche-charging-badge");
+  if (data.porsche_charging === true) {
+    $("porsche-charging-state").textContent = "Laedt";
+    porscheChargingBadge.className = "status-badge ok";
+  } else if (data.porsche_charging === false) {
+    $("porsche-charging-state").textContent = "Laedt nicht";
+    porscheChargingBadge.className = "status-badge neutral";
   } else {
-    easeeBadge.className = "status-badge ok";
+    $("porsche-charging-state").textContent = "–";
+    porscheChargingBadge.className = "status-badge neutral";
   }
 
   $("porsche-state").textContent = data.porsche_captcha_pending
-    ? "🧩 Captcha noetig -- im Zugangsdaten-Tab loesen"
-    : data.porsche_status
-      ? `${porscheIcon(data.porsche_status, !!data.porsche_error)} ${data.porsche_status}`
-      : `${porscheIcon(null, !!data.porsche_error)} –`;
+    ? "Captcha noetig -- im Settings-Tab loesen"
+    : data.porsche_status || "–";
 
   $("porsche-battery-stat").textContent = data.porsche_battery != null ? `${Math.round(data.porsche_battery)}%` : "–";
 
@@ -109,13 +118,10 @@ async function refreshLive() {
   }
 
   if (data.porsche_is_home === true) {
-    $("porsche-home-icon").textContent = "🏠";
     $("porsche-location").textContent = "Zuhause";
   } else if (data.porsche_is_home === false) {
-    $("porsche-home-icon").textContent = "📍";
     $("porsche-location").textContent = `${data.porsche_distance_km} km entfernt`;
   } else {
-    $("porsche-home-icon").textContent = "📍";
     $("porsche-location").textContent = "Unbekannt";
   }
 
@@ -138,11 +144,13 @@ async function refreshLive() {
   }
 
   $("status-dot").style.background = namedErrors.length ? "var(--error)" : "var(--ok)";
-  $("status-dot").style.boxShadow = namedErrors.length ? "0 0 8px var(--error)" : "0 0 8px var(--ok)";
 
   renderForecast(data.forecast || []);
   $("forecast-error").textContent = data.forecast_error || "";
-  renderHistoryChart(data.history || []);
+  const historyCard = document.querySelector('.card[data-card="history"]');
+  if (!historyCard.classList.contains("collapsed")) {
+    renderHistoryChart(data.history || []);
+  }
 }
 
 function renderHistoryChart(history) {
@@ -175,7 +183,7 @@ function renderHistoryChart(history) {
   const y = (v) => padT + (1 - (v - vMin) / Math.max(1, vMax - vMin)) * (cssHeight - padT - padB);
 
   // Ladezeitraeume einfaerben
-  ctx.fillStyle = "rgba(61, 220, 132, 0.14)";
+  ctx.fillStyle = "rgba(31, 138, 82, 0.12)";
   let bandStart = null;
   history.forEach((h, i) => {
     if (h.charging_active && bandStart == null) bandStart = times[i];
@@ -187,15 +195,15 @@ function renderHistoryChart(history) {
   });
 
   // Nulllinie
-  ctx.strokeStyle = "#29292e";
+  ctx.strokeStyle = "#d8d4cc";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, y(0));
   ctx.lineTo(cssWidth, y(0));
   ctx.stroke();
 
-  // Schwellwert (gestrichelt, gold)
-  ctx.strokeStyle = "#e8b23d";
+  // Schwellwert (gestrichelt, bronze)
+  ctx.strokeStyle = "#9c7a45";
   ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -210,7 +218,7 @@ function renderHistoryChart(history) {
   ctx.setLineDash([]);
 
   // Ueberschuss (durchgezogen, gruen)
-  ctx.strokeStyle = "#3ddc84";
+  ctx.strokeStyle = "#1f8a52";
   ctx.lineWidth = 2;
   ctx.beginPath();
   started = false;
@@ -345,6 +353,8 @@ async function saveSettings() {
   setTimeout(() => ($("settings-saved").textContent = ""), 2000);
 }
 
+const debouncedSaveSettings = debounce(saveSettings, 500);
+
 async function loadCredentials() {
   const res = await fetch("/api/credentials");
   const c = await res.json();
@@ -401,6 +411,8 @@ async function saveCredentials() {
   setTimeout(() => ($("credentials-saved").textContent = ""), 2000);
   testConnections();
 }
+
+const debouncedSaveCredentials = debounce(saveCredentials, 700);
 
 async function testOne(ledId, endpoint) {
   const led = $(ledId);
@@ -515,8 +527,37 @@ async function doReboot() {
   setTimeout(() => ($("reboot-hint").textContent = ""), 5000);
 }
 
+const SETTINGS_FIELD_IDS = [
+  "threshold",
+  "start-debounce",
+  "stop-debounce",
+  "curfew-enabled",
+  "curfew-start",
+  "curfew-end",
+  "curfew-solar-coupled",
+  "curfew-solar-offset",
+  "no-reboot-in-curfew",
+  "charge-limit",
+  "reboot-cooldown",
+];
+
+const CREDENTIAL_FIELD_IDS = [
+  "porsche-email",
+  "porsche-password",
+  "porsche-vin",
+  "porsche-session",
+  "porsche-poll-minutes",
+  "easee-email",
+  "easee-password",
+  "easee-charger-id",
+  "solar-manager-id",
+  "solar-api-key",
+  "solar-poll-seconds",
+];
+
 function init() {
   setupTabs();
+  setupCollapsibleCards();
   loadSettings();
   loadCredentials();
   refreshLive();
@@ -529,11 +570,17 @@ function init() {
   $("charge-limit").addEventListener("input", () => {
     $("charge-limit-value").textContent = `${$("charge-limit").value}%`;
   });
-  document.querySelectorAll('input[name="mode"]').forEach((el) => el.addEventListener("change", updateSmartVisibility));
+  document.querySelectorAll('input[name="mode"]').forEach((el) =>
+    el.addEventListener("change", () => {
+      updateSmartVisibility();
+      debouncedSaveSettings();
+    })
+  );
   $("curfew-solar-coupled").addEventListener("change", updateCurfewModeVisibility);
   $("curfew-solar-offset").addEventListener("input", updateCurfewSolarPreview);
-  $("save-settings").addEventListener("click", saveSettings);
-  $("save-credentials").addEventListener("click", saveCredentials);
+  SETTINGS_FIELD_IDS.forEach((id) => $(id).addEventListener("change", debouncedSaveSettings));
+  CREDENTIAL_FIELD_IDS.forEach((id) => $(id).addEventListener("change", debouncedSaveCredentials));
+
   $("reboot-btn").addEventListener("click", doReboot);
   $("geocode-btn").addEventListener("click", doGeocode);
   $("refresh-btn").addEventListener("click", doRefresh);

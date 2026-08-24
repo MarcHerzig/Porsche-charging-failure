@@ -33,6 +33,7 @@ LIVE: dict = {
     "easee_error": None,
     "porsche_status": None,
     "porsche_battery": None,
+    "porsche_charging": None,
     "porsche_error": None,
     "porsche_updated_at": None,
     "porsche_connected": None,
@@ -250,6 +251,7 @@ async def _tick_porsche() -> None:
     LIVE.update(
         porsche_status=status.status,
         porsche_battery=status.battery_percent,
+        porsche_charging=status.is_charging,
         porsche_error=None,
         porsche_connected=True,
         porsche_updated_at=now.isoformat(),
