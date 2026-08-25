@@ -6,16 +6,12 @@
   <title>Taycan Energy Control</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Mrs+Saint+Delafield&family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}" />
 </head>
 <body>
   <header class="hero">
-    <div class="hero-inner">
-      <img class="hero-logo" src="/static/taycan-logo.jpg?v={{ asset_version }}" alt="Porsche Taycan" />
-      <div class="hero-title">Taycan</div>
-      <div class="hero-subtitle">Energy Control</div>
-    </div>
+    <div class="hero-title">Taycan Energy Control</div>
     <nav>
       <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
       <button class="tab-btn" data-tab="credentials">Settings</button>
@@ -66,10 +62,6 @@
                 <span id="porsche-battery-stat">–</span>
                 <small>Ladestand</small>
               </div>
-              <div class="stat">
-                <span id="porsche-location">–</span>
-                <small>Standort</small>
-              </div>
             </div>
             <div class="status-badges">
               <div class="status-badge" id="porsche-charging-badge">
@@ -78,9 +70,6 @@
                   <span id="porsche-charging-state">–</span>
                 </div>
               </div>
-            </div>
-            <div class="pill-row">
-              <span class="pill" id="porsche-state">–</span>
             </div>
           </div>
         </div>

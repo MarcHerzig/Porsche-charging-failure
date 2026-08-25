@@ -99,14 +99,13 @@ async function refreshLive() {
     porscheChargingBadge.className = "status-badge neutral";
   }
 
-  $("porsche-state").textContent = data.porsche_captcha_pending
-    ? "Captcha noetig -- im Settings-Tab loesen"
-    : data.porsche_status || "–";
-
   $("porsche-battery-stat").textContent = data.porsche_battery != null ? `${Math.round(data.porsche_battery)}%` : "–";
 
   const led = $("porsche-led");
-  if (data.porsche_connected === true) {
+  if (data.porsche_captcha_pending) {
+    led.className = "led pending";
+    led.title = "Captcha erforderlich -- im Settings-Tab loesen";
+  } else if (data.porsche_connected === true) {
     led.className = "led ok";
     led.title = "Porsche Connect verbunden";
   } else if (data.porsche_connected === false) {
@@ -115,14 +114,6 @@ async function refreshLive() {
   } else {
     led.className = "led";
     led.title = "Noch keine Daten";
-  }
-
-  if (data.porsche_is_home === true) {
-    $("porsche-location").textContent = "Zuhause";
-  } else if (data.porsche_is_home === false) {
-    $("porsche-location").textContent = `${data.porsche_distance_km} km entfernt`;
-  } else {
-    $("porsche-location").textContent = "Unbekannt";
   }
 
   const namedErrors = [

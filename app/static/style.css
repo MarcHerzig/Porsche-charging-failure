@@ -29,39 +29,17 @@ header.hero {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: var(--bg-alt);
-  border-bottom: 1px solid var(--border);
-}
-
-.hero-inner {
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-.hero-logo {
-  max-width: 340px;
-  width: 100%;
-  height: auto;
-  display: block;
-  margin: 0 auto;
+  background: var(--bg);
 }
 
 .hero-title {
-  font-family: "Mrs Saint Delafield", cursive;
-  font-size: clamp(2.6rem, 7vw, 4.2rem);
-  color: var(--text);
-  line-height: 1;
-  margin-top: -0.5rem;
-}
-
-.hero-subtitle {
-  font-family: "Barlow Condensed", sans-serif;
-  font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: 0.4em;
-  color: var(--muted);
-  margin-top: 0.3rem;
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 4vw, 2.2rem);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 1.25rem;
 }
 
 header.hero nav {
@@ -217,16 +195,6 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
 .stat { display: flex; flex-direction: column; gap: 0.2rem; }
 .stat span { display: block; font-size: 1.7rem; font-weight: 700; font-family: "Barlow Condensed", sans-serif; }
 .stat small { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
-
-.pill-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
-.pill {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.3rem 0.8rem;
-  font-size: 0.8rem;
-  color: var(--text);
-}
 
 /* ---------- Status Badges ---------- */
 .status-badges { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.75rem; }
