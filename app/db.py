@@ -44,7 +44,8 @@ def _init_schema() -> None:
                 no_reboot_in_curfew INTEGER NOT NULL DEFAULT 0,
                 solar_poll_seconds INTEGER NOT NULL DEFAULT 30,
                 porsche_poll_seconds INTEGER NOT NULL DEFAULT 900,
-                charge_limit_percent REAL NOT NULL DEFAULT 100
+                charge_limit_percent REAL NOT NULL DEFAULT 100,
+                app_enabled INTEGER NOT NULL DEFAULT 1
             );
 
             CREATE TABLE IF NOT EXISTS credentials (
@@ -105,6 +106,9 @@ def _init_schema() -> None:
     if "charge_limit_percent" not in existing_settings_cols:
         with _conn:
             _conn.execute("ALTER TABLE settings ADD COLUMN charge_limit_percent REAL NOT NULL DEFAULT 100")
+    if "app_enabled" not in existing_settings_cols:
+        with _conn:
+            _conn.execute("ALTER TABLE settings ADD COLUMN app_enabled INTEGER NOT NULL DEFAULT 1")
 
     # Migration: solar_base_url (lokale API) -> solar_manager_id (Cloud-API).
     existing_cred_cols = {row[1] for row in _conn.execute("PRAGMA table_info(credentials)")}
@@ -156,6 +160,7 @@ def update_settings(fields: dict[str, Any]) -> None:
         "solar_poll_seconds",
         "porsche_poll_seconds",
         "charge_limit_percent",
+        "app_enabled",
     }
     fields = {k: v for k, v in fields.items() if k in allowed}
     if not fields:

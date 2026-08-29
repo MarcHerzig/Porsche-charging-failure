@@ -293,6 +293,7 @@ function updateCurfewSolarPreview() {
 async function loadSettings() {
   const res = await fetch("/api/settings");
   const s = await res.json();
+  $("app-enabled").checked = !!s.app_enabled;
   document.querySelector(`input[name="mode"][value="${s.mode}"]`).checked = true;
   $("threshold").value = s.threshold_w;
   $("threshold-value").textContent = `${s.threshold_w} W`;
@@ -322,6 +323,7 @@ async function loadSettings() {
 
 async function saveSettings() {
   const payload = {
+    app_enabled: $("app-enabled").checked,
     mode: document.querySelector('input[name="mode"]:checked').value,
     threshold_w: Number($("threshold").value),
     start_debounce_min: Number($("start-debounce").value),
@@ -519,6 +521,7 @@ async function doReboot() {
 }
 
 const SETTINGS_FIELD_IDS = [
+  "app-enabled",
   "threshold",
   "start-debounce",
   "stop-debounce",

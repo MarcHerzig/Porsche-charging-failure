@@ -130,6 +130,8 @@ async def _tick_solar_easee() -> None:
     except solar_client.SolarManagerError as exc:
         LIVE["solar_error"] = str(exc)
 
+    app_enabled = bool(settings.get("app_enabled", True))
+
     sunrise, sunset = _todays_sun_times()
     decision = control.evaluate(
         surplus_watts=surplus_watts,
@@ -142,8 +144,8 @@ async def _tick_solar_easee() -> None:
         sunrise=sunrise,
         sunset=sunset,
     )
-    LIVE["charging_active"] = decision.charging_active
-    LIVE["decision_reason"] = decision.reason
+    LIVE["charging_active"] = decision.charging_active if app_enabled else None
+    LIVE["decision_reason"] = decision.reason if app_enabled else "App deaktiviert -- keine Automatik aktiv"
 
     LIVE["history"].append(
         {
@@ -152,7 +154,7 @@ async def _tick_solar_easee() -> None:
             "consumption_w": LIVE["consumption_w"],
             "surplus_w": surplus_watts,
             "threshold_w": settings["threshold_w"],
-            "charging_active": decision.charging_active,
+            "charging_active": decision.charging_active if app_enabled else False,
         }
     )
     if len(LIVE["history"]) > HISTORY_MAX_POINTS:
@@ -166,7 +168,7 @@ async def _tick_solar_easee() -> None:
         }
     )
 
-    if decision.changed:
+    if app_enabled and decision.changed:
         try:
             device_id = await solar_client.find_car_charger_device_id(
                 creds["solar_manager_id"], creds["solar_api_key"]
@@ -269,10 +271,11 @@ async def _tick_porsche() -> None:
     limit_reached = (
         charge_limit is not None and status.battery_percent is not None and status.battery_percent >= charge_limit
     )
+    app_enabled = bool(settings.get("app_enabled", True))
 
-    if limit_reached:
-        # Ladelimit erreicht -- Ladefehler/Reboot-Automatik bewusst ignorieren,
-        # das Auto ist ohnehin "fertig" geladen und braucht keinen Eingriff.
+    if limit_reached or not app_enabled:
+        # Ladelimit erreicht oder App deaktiviert -- Ladefehler/Reboot-
+        # Automatik bewusst ignorieren, kein Eingriff.
         if error_since is not None:
             db.update_runtime_state({"porsche_error_since": None})
     elif status.is_error:

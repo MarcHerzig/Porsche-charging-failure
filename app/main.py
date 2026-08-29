@@ -73,6 +73,7 @@ class SettingsUpdate(BaseModel):
     curfew_solar_coupled: bool | None = None
     curfew_solar_offset_min: int | None = None
     no_reboot_in_curfew: bool | None = None
+    app_enabled: bool | None = None
     # Untergrenzen bewusst konservativ: Solar Manager ist eine leichte Cloud-
     # API (kein bekanntes Rate-Limit-Problem), Porsche Connect cacht zwar die
     # Session (siehe integrations/porsche_client.py), ein zu kurzes Intervall
@@ -91,6 +92,8 @@ async def update_settings(payload: SettingsUpdate):
         fields["curfew_solar_coupled"] = int(fields["curfew_solar_coupled"])
     if "no_reboot_in_curfew" in fields:
         fields["no_reboot_in_curfew"] = int(fields["no_reboot_in_curfew"])
+    if "app_enabled" in fields:
+        fields["app_enabled"] = int(fields["app_enabled"])
     db.update_settings(fields)
     return db.get_settings()
 

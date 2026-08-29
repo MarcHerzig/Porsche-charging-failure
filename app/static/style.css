@@ -196,6 +196,41 @@ main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
 .stat span { display: block; font-size: 1.7rem; font-weight: 700; font-family: "Barlow Condensed", sans-serif; }
 .stat small { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
 
+/* ---------- Master switch ---------- */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-bottom: 0.4rem;
+}
+
+.switch { position: relative; display: inline-block; width: 40px; height: 23px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 999px;
+  transition: background 0.15s;
+}
+.switch-track::before {
+  content: "";
+  position: absolute;
+  width: 17px;
+  height: 17px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s;
+  box-shadow: 0 1px 2px rgba(22, 23, 26, 0.25);
+}
+.switch input:checked + .switch-track { background: var(--ok); }
+.switch input:checked + .switch-track::before { transform: translateX(17px); }
+
 /* ---------- Status Badges ---------- */
 .status-badges { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.75rem; }
 
