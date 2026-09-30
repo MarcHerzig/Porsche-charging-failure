@@ -22,7 +22,7 @@ import re
 from dataclasses import dataclass
 
 import aiohttp
-from pyeasee import Easee
+from pyeasee import ChargerState, Easee
 from pyeasee.exceptions import NotFoundException
 
 from .. import request_log
@@ -128,10 +128,38 @@ async def _get_charger(email: str, password: str, charger_id: str):
     return easee, charger
 
 
+# Easee-Beobachtungs-IDs: 109 = ChargerOpMode, 96 = ReasonForNoCurrent.
+_OBS_OPMODE, _OBS_REASON = 109, 96
+
+
+async def _state_aus_observations(charger) -> dict:
+    """Denselben Status ueber `/state/{id}/observations` holen.
+
+    `GET /api/chargers/{id}/state` antwortet bei Easee seit dem 01.10.2026
+    mit einem leeren 404 (Lukas sieht es in Postman genauso), waehrend
+    `/details` und `/config` gehen. Die Beobachtungen liefern dieselben beiden
+    Werte; pyeasee uebersetzt sie wie gewohnt in Klartext.
+    """
+    obs = (await charger.get_observations(_OBS_OPMODE, _OBS_REASON))["observations"]
+    werte = {o["id"]: o["value"] for o in obs}
+    if _OBS_OPMODE not in werte or _OBS_REASON not in werte:
+        raise EaseeError("Easee meldet keine Beobachtungen fuer diese Wallbox.")
+    return ChargerState(
+        {"chargerOpMode": werte[_OBS_OPMODE], "reasonForNoCurrent": werte[_OBS_REASON]},
+        False,
+    )
+
+
 async def get_state(email: str, password: str, charger_id: str) -> EaseeState:
     _, charger = await _get_charger(email, password, charger_id)
     try:
-        state = await charger.get_state()
+        try:
+            state = await charger.get_state()
+        except NotFoundException:
+            # Kein Verbindungsfehler: die Verbindung NICHT verwerfen. Vorher
+            # loeste jedes 404 ein neues Login plus `/api/chargers` aus — alle
+            # ~90 s — und trieb den Account ins Rate-Limit (429).
+            state = await _state_aus_observations(charger)
         reason = str(state["reasonForNoCurrent"])
         reason_code, has_current = _parse_reason(reason)
         return EaseeState(
@@ -143,16 +171,8 @@ async def get_state(email: str, password: str, charger_id: str) -> EaseeState:
     except EaseeError:
         raise
     except NotFoundException as exc:
-        # Easee antwortet auf `/state` mit einem leeren 404, obwohl Login,
-        # Wallbox-Liste, Details und Konfiguration derselben Wallbox klappen
-        # (Stand 01.10.2026, Wallbox EC69R8HN). Das ist kein Verbindungs-
-        # fehler: die Verbindung NICHT verwerfen. Vorher loeste jedes 404 ein
-        # neues Login plus `/api/chargers` aus — alle ~90 s — und trieb den
-        # Account ins Rate-Limit (429), ohne dass es den Status zurueckbrachte.
         raise EaseeError(
-            "Easee liefert fuer diese Wallbox keinen Status (404 auf /state) — "
-            "Login und Wallbox-Zugriff funktionieren, Befehle sind davon "
-            "unberuehrt."
+            "Easee liefert fuer diese Wallbox weder /state noch Beobachtungen (404)."
         ) from exc
     except Exception as exc:  # noqa: BLE001
         await _invalidate()
