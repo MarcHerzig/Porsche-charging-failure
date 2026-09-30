@@ -23,6 +23,7 @@ from dataclasses import dataclass
 
 import aiohttp
 from pyeasee import Easee
+from pyeasee.exceptions import NotFoundException
 
 from .. import request_log
 
@@ -141,9 +142,21 @@ async def get_state(email: str, password: str, charger_id: str) -> EaseeState:
         )
     except EaseeError:
         raise
+    except NotFoundException as exc:
+        # Easee antwortet auf `/state` mit einem leeren 404, obwohl Login,
+        # Wallbox-Liste, Details und Konfiguration derselben Wallbox klappen
+        # (Stand 01.10.2026, Wallbox EC69R8HN). Das ist kein Verbindungs-
+        # fehler: die Verbindung NICHT verwerfen. Vorher loeste jedes 404 ein
+        # neues Login plus `/api/chargers` aus — alle ~90 s — und trieb den
+        # Account ins Rate-Limit (429), ohne dass es den Status zurueckbrachte.
+        raise EaseeError(
+            "Easee liefert fuer diese Wallbox keinen Status (404 auf /state) — "
+            "Login und Wallbox-Zugriff funktionieren, Befehle sind davon "
+            "unberuehrt."
+        ) from exc
     except Exception as exc:  # noqa: BLE001
         await _invalidate()
-        raise EaseeError(f"Easee-Statusabfrage fehlgeschlagen: {exc}") from exc
+        raise EaseeError(f"Easee-Statusabfrage fehlgeschlagen: {exc!r}") from exc
 
 
 async def reboot(email: str, password: str, charger_id: str) -> None:
