@@ -161,13 +161,13 @@ async def _state_aus_observations(charger) -> dict:
 async def get_state(email: str, password: str, charger_id: str) -> EaseeState:
     _, charger = await _get_charger(email, password, charger_id)
     try:
-        try:
-            state = await charger.get_state()
-        except NotFoundException:
-            # Kein Verbindungsfehler: die Verbindung NICHT verwerfen. Vorher
-            # loeste jedes 404 ein neues Login plus `/api/chargers` aus — alle
-            # ~90 s — und trieb den Account ins Rate-Limit (429).
-            state = await _state_aus_observations(charger)
+        # `GET /api/chargers/{id}/state` direkt gar nicht mehr versuchen:
+        # seit 01.10.2026 antwortete er mit 404, inzwischen mit 403
+        # (ForbiddenServiceException) -- der Endpoint scheint bei Easee
+        # endgueltig abgeschaltet zu werden. Die Beobachtungen liefern
+        # dieselben Werte zuverlaessig, also direkt die nehmen statt bei
+        # jedem neuen Fehlercode erneut nachzuziehen.
+        state = await _state_aus_observations(charger)
         reason = str(state["reasonForNoCurrent"])
         reason_code, has_current = _parse_reason(reason)
         try:
