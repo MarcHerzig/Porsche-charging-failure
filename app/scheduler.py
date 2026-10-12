@@ -31,6 +31,7 @@ LIVE: dict = {
     "easee_reason": None,
     "easee_has_current": None,
     "easee_error": None,
+    "car_charging_w": None,
     "porsche_status": None,
     "porsche_battery": None,
     "porsche_charging": None,
@@ -114,15 +115,41 @@ async def _tick_solar_easee() -> None:
     runtime = db.get_runtime_state()
     now = datetime.now(timezone.utc)
 
+    # Easee VOR der Ueberschuss-Berechnung abfragen, um die aktuelle eigene
+    # Ladeleistung des Autos zu kennen -- die wird gleich aus dem gemessenen
+    # Hausverbrauch herausgerechnet.
+    car_charging_w = 0.0
+    try:
+        easee_state = await easee_client.get_state(
+            creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
+        )
+        LIVE["easee_op_mode"] = easee_state.op_mode
+        LIVE["easee_reason"] = easee_state.reason_for_no_current
+        LIVE["easee_has_current"] = easee_state.has_current
+        car_charging_w = easee_state.charging_power_w
+        LIVE["easee_error"] = None
+    except easee_client.EaseeError as exc:
+        # Keine Easee-Daten -- ohne eigene Ladeleistung weiterrechnen (altes
+        # Verhalten), statt den ganzen Tick abzubrechen.
+        LIVE["easee_error"] = str(exc)
+
     surplus_watts = None
     try:
         point = await solar_client.get_current_point(creds["solar_manager_id"], creds["solar_api_key"])
+        # Der gemessene Hausverbrauch (cW) enthaelt die Ladeleistung des
+        # Autos selbst. Ohne Korrektur wuerde das Auto durch sein eigenes
+        # Laden den Ueberschuss unter den Schwellwert druecken und sich
+        # dadurch selbst wieder abschalten (Rueckkopplungs-Loop). Deshalb
+        # wird die eigene Ladeleistung zuerst herausgerechnet -- der
+        # Ueberschuss bezieht sich dann auf "alles ausser dem Auto".
+        other_consumption_w = max(0.0, point.consumption_w - car_charging_w)
         # Negativer Ueberschuss (mehr Verbrauch als Produktion) ist fuer die
         # Ladeentscheidung/Anzeige gleichbedeutend mit "kein Ueberschuss".
-        surplus_watts = max(0.0, point.production_w - point.consumption_w)
+        surplus_watts = max(0.0, point.production_w - other_consumption_w)
         LIVE.update(
             pv_watts=point.production_w,
             consumption_w=point.consumption_w,
+            car_charging_w=car_charging_w,
             surplus_watts=surplus_watts,
             solar_error=None,
             solar_updated_at=now.isoformat(),
@@ -153,6 +180,7 @@ async def _tick_solar_easee() -> None:
             "production_w": LIVE["pv_watts"],
             "consumption_w": LIVE["consumption_w"],
             "surplus_w": surplus_watts,
+            "car_charging_w": LIVE["car_charging_w"],
             "threshold_w": settings["threshold_w"],
             "charging_active": decision.charging_active if app_enabled else False,
         }
@@ -194,16 +222,6 @@ async def _tick_solar_easee() -> None:
         except solar_client.SolarManagerError as exc:
             LIVE["solar_error"] = str(exc)
             db.add_event("solar_manager_error", f"Solar-Manager-Befehl fehlgeschlagen: {exc}")
-
-    try:
-        state = await easee_client.get_state(
-            creds["easee_email"], creds["easee_password"], creds["easee_charger_id"]
-        )
-        LIVE["easee_op_mode"] = state.op_mode
-        LIVE["easee_reason"] = state.reason_for_no_current
-        LIVE["easee_has_current"] = state.has_current
-    except easee_client.EaseeError as exc:
-        LIVE["easee_error"] = str(exc)
 
 
 async def _porsche_loop() -> None:

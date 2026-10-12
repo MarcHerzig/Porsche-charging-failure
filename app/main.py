@@ -61,6 +61,7 @@ async def get_settings():
 class SettingsUpdate(BaseModel):
     mode: str | None = None
     threshold_w: float | None = None
+    threshold_enabled: bool | None = None
     start_debounce_min: int | None = None
     stop_debounce_min: int | None = None
     curfew_enabled: bool | None = None
@@ -94,6 +95,8 @@ async def update_settings(payload: SettingsUpdate):
         fields["no_reboot_in_curfew"] = int(fields["no_reboot_in_curfew"])
     if "app_enabled" in fields:
         fields["app_enabled"] = int(fields["app_enabled"])
+    if "threshold_enabled" in fields:
+        fields["threshold_enabled"] = int(fields["threshold_enabled"])
     db.update_settings(fields)
     return db.get_settings()
 

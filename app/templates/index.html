@@ -37,9 +37,13 @@
                 <span id="consumption-watts">–</span>
                 <small>Verbrauch (W)</small>
               </div>
-              <div class="stat" title="Ueberschuss = Produktion minus Verbrauch -- dieser Wert entscheidet, ob geladen wird">
+              <div class="stat" title="Ueberschuss = Produktion minus Verbrauch ohne die eigene Ladeleistung des Autos -- dieser Wert entscheidet, ob geladen wird">
                 <span id="surplus-watts">–</span>
-                <small>Ueberschuss in W (Produktion − Verbrauch)</small>
+                <small>Ueberschuss in W (ohne Auto-Ladeleistung)</small>
+              </div>
+              <div class="stat" title="Aktuelle Ladeleistung des Autos selbst (von Easee), wird vom Verbrauch abgezogen, bevor der Ueberschuss berechnet wird">
+                <span id="car-charging-watts">–</span>
+                <small>Auto-Ladeleistung (W)</small>
               </div>
             </div>
             <div class="status-badges">
@@ -98,6 +102,10 @@
             </div>
 
             <div id="smart-settings">
+              <label class="checkbox">
+                <input type="checkbox" id="threshold-enabled" /> Schwellwert aktiv
+              </label>
+              <p class="hint">Aus: es wird ausserhalb der Sperrzone immer geladen, der PV-Ueberschuss wird fuer die Start/Stopp-Entscheidung ignoriert.</p>
               <label class="field">
                 <span class="field-label">Schwellwert -- Ueberschuss W fuer Ladestart <strong id="threshold-value">–</strong></span>
                 <input type="range" id="threshold" min="0" max="11000" step="100" />

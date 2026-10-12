@@ -46,6 +46,7 @@ class EaseeState:
     reason_for_no_current: str
     reason_code: int | None
     has_current: bool
+    charging_power_w: float
 
 
 def _parse_reason(raw: str) -> tuple[int | None, bool]:
@@ -128,8 +129,9 @@ async def _get_charger(email: str, password: str, charger_id: str):
     return easee, charger
 
 
-# Easee-Beobachtungs-IDs: 109 = ChargerOpMode, 96 = ReasonForNoCurrent.
-_OBS_OPMODE, _OBS_REASON = 109, 96
+# Easee-Beobachtungs-IDs: 109 = ChargerOpMode, 96 = ReasonForNoCurrent,
+# 120 = TotalPower (aktuelle Ladeleistung in kW).
+_OBS_OPMODE, _OBS_REASON, _OBS_POWER = 109, 96, 120
 
 
 async def _state_aus_observations(charger) -> dict:
@@ -137,15 +139,21 @@ async def _state_aus_observations(charger) -> dict:
 
     `GET /api/chargers/{id}/state` antwortet bei Easee seit dem 01.10.2026
     mit einem leeren 404 (Lukas sieht es in Postman genauso), waehrend
-    `/details` und `/config` gehen. Die Beobachtungen liefern dieselben beiden
-    Werte; pyeasee uebersetzt sie wie gewohnt in Klartext.
+    `/details` und `/config` gehen. Die Beobachtungen liefern dieselben
+    Werte; pyeasee uebersetzt sie wie gewohnt in Klartext. TotalPower ist
+    hier optional (0 falls nicht gemeldet) -- nur OpMode/Reason sind fuer den
+    Status zwingend.
     """
-    obs = (await charger.get_observations(_OBS_OPMODE, _OBS_REASON))["observations"]
+    obs = (await charger.get_observations(_OBS_OPMODE, _OBS_REASON, _OBS_POWER))["observations"]
     werte = {o["id"]: o["value"] for o in obs}
     if _OBS_OPMODE not in werte or _OBS_REASON not in werte:
         raise EaseeError("Easee meldet keine Beobachtungen fuer diese Wallbox.")
     return ChargerState(
-        {"chargerOpMode": werte[_OBS_OPMODE], "reasonForNoCurrent": werte[_OBS_REASON]},
+        {
+            "chargerOpMode": werte[_OBS_OPMODE],
+            "reasonForNoCurrent": werte[_OBS_REASON],
+            "totalPower": werte.get(_OBS_POWER, 0.0),
+        },
         False,
     )
 
@@ -162,11 +170,16 @@ async def get_state(email: str, password: str, charger_id: str) -> EaseeState:
             state = await _state_aus_observations(charger)
         reason = str(state["reasonForNoCurrent"])
         reason_code, has_current = _parse_reason(reason)
+        try:
+            charging_power_w = float(state["totalPower"] or 0.0) * 1000.0
+        except (KeyError, TypeError, ValueError):
+            charging_power_w = 0.0
         return EaseeState(
             op_mode=str(state["chargerOpMode"]),
             reason_for_no_current=reason,
             reason_code=reason_code,
             has_current=has_current,
+            charging_power_w=charging_power_w,
         )
     except EaseeError:
         raise

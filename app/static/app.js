@@ -73,6 +73,7 @@ async function refreshLive() {
   $("pv-watts").textContent = data.pv_watts != null ? Math.round(data.pv_watts) : "–";
   $("consumption-watts").textContent = data.consumption_w != null ? Math.round(data.consumption_w) : "–";
   $("surplus-watts").textContent = data.surplus_watts != null ? Math.round(data.surplus_watts) : "–";
+  $("car-charging-watts").textContent = data.car_charging_w != null ? Math.round(data.car_charging_w) : "–";
   $("charging-reason").textContent = data.decision_reason || "";
 
   const chargingBadge = $("charging-badge");
@@ -261,6 +262,11 @@ function updateSmartVisibility() {
   $("smart-settings").style.display = mode === "smart" ? "block" : "none";
 }
 
+function updateThresholdVisibility() {
+  const enabled = $("threshold-enabled").checked;
+  $("threshold").disabled = !enabled;
+}
+
 function updateCurfewModeVisibility() {
   const coupled = $("curfew-solar-coupled").checked;
   $("curfew-start").disabled = coupled;
@@ -295,6 +301,7 @@ async function loadSettings() {
   const s = await res.json();
   $("app-enabled").checked = !!s.app_enabled;
   document.querySelector(`input[name="mode"][value="${s.mode}"]`).checked = true;
+  $("threshold-enabled").checked = !!s.threshold_enabled;
   $("threshold").value = s.threshold_w;
   $("threshold-value").textContent = `${s.threshold_w} W`;
   $("start-debounce").value = s.start_debounce_min;
@@ -318,6 +325,7 @@ async function loadSettings() {
     $("location-resolved").textContent = `Aktuell: ${s.location_name} (${s.lat}, ${s.lon})`;
   }
   updateSmartVisibility();
+  updateThresholdVisibility();
   updateCurfewModeVisibility();
 }
 
@@ -325,6 +333,7 @@ async function saveSettings() {
   const payload = {
     app_enabled: $("app-enabled").checked,
     mode: document.querySelector('input[name="mode"]:checked').value,
+    threshold_enabled: $("threshold-enabled").checked,
     threshold_w: Number($("threshold").value),
     start_debounce_min: Number($("start-debounce").value),
     stop_debounce_min: Number($("stop-debounce").value),
@@ -522,6 +531,7 @@ async function doReboot() {
 
 const SETTINGS_FIELD_IDS = [
   "app-enabled",
+  "threshold-enabled",
   "threshold",
   "start-debounce",
   "stop-debounce",
@@ -570,6 +580,7 @@ function init() {
       debouncedSaveSettings();
     })
   );
+  $("threshold-enabled").addEventListener("change", updateThresholdVisibility);
   $("curfew-solar-coupled").addEventListener("change", updateCurfewModeVisibility);
   $("curfew-solar-offset").addEventListener("input", updateCurfewSolarPreview);
   SETTINGS_FIELD_IDS.forEach((id) => $(id).addEventListener("change", debouncedSaveSettings));

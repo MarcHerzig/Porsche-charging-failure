@@ -103,6 +103,13 @@ def evaluate(
             start, end = effective_curfew_window(local_now, settings, sunrise, sunset)
             raw_should_charge = False
             reason = f"Sperrzone aktiv ({start.strftime('%H:%M')}-{end.strftime('%H:%M')})"
+        elif not settings.get("threshold_enabled", True):
+            # Schwellwert bewusst deaktiviert (z.B. weil die Verbrauchsmessung
+            # die Ladeleistung des Autos selbst miterfasst und so einen
+            # Rueckkopplungs-Loop zwischen Laden/Stoppen erzeugt) -- ausserhalb
+            # der Sperrzone wird dann unabhaengig vom PV-Ueberschuss geladen.
+            raw_should_charge = True
+            reason = "Schwellwert deaktiviert (Ueberschuss wird ignoriert)"
         elif surplus_watts is None:
             # Keine aktuelle PV-Messung -- sicherheitshalber nicht laden.
             raw_should_charge = False
